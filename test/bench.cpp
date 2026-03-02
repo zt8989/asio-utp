@@ -140,12 +140,26 @@ void send(Socket& s, Type type, asio::yield_context yield)
 }
 
 template<typename Proto>
-typename Proto::socket connect( asio::io_context& ioc
-                              , const std::string& remote_ep_s
-                              , asio::yield_context yield)
+typename Proto::socket connect(asio::io_context&, const std::string&, asio::yield_context);
+
+template<>
+tcp::socket connect<tcp>( asio::io_context& ioc
+                        , const std::string& remote_ep_s
+                        , asio::yield_context yield)
 {
-    auto remote_ep = parse_endpoint<Proto>(remote_ep_s);
-    typename Proto::socket socket(ioc);
+    auto remote_ep = parse_endpoint<tcp>(remote_ep_s);
+    tcp::socket socket(ioc);
+    socket.async_connect(remote_ep, yield);
+    return socket;
+}
+
+template<>
+utp::socket connect<utp::protocol>( asio::io_context& ioc
+                                  , const std::string& remote_ep_s
+                                  , asio::yield_context yield)
+{
+    auto remote_ep = parse_endpoint<utp::protocol>(remote_ep_s);
+    utp::socket socket(ioc);
     std::error_code ec;
     socket.bind({asio::ip::address_v4::any(), 0}, ec);
     assert(!ec);

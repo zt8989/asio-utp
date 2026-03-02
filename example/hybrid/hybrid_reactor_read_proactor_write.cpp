@@ -127,25 +127,35 @@ public:
 
 void run_server(asio::io_context& ioc, const ip::udp::endpoint& ep)
 {
-    auto listener = std::make_shared<utp::acceptor>(ioc);
+    struct server_state {
+        explicit server_state(asio::io_context& ioc_)
+            : acceptor(ioc_)
+            , pending_socket(ioc_)
+        {}
+
+        utp::acceptor acceptor;
+        utp::socket pending_socket;
+        std::shared_ptr<peer> active_peer;
+    };
+
+    auto st = std::make_shared<server_state>(ioc);
     sys_ec ec;
-    listener->bind(ep, ec);
+    st->acceptor.bind(ep, ec);
     if (ec) {
         throw std::runtime_error("bind failed: " + ec.message());
     }
 
-    std::cerr << "listening on " << listener->local_endpoint() << "\n";
+    std::cerr << "listening on " << st->acceptor.local_endpoint() << "\n";
 
-    auto peer_socket = std::make_shared<utp::socket>(ioc);
-    listener->async_accept(*peer_socket, [listener, peer_socket](const sys_ec& aec) mutable {
+    st->acceptor.async_accept(st->pending_socket, [st](const sys_ec& aec) mutable {
         if (aec) {
             std::cerr << "accept failed: " << aec.message() << "\n";
             return;
         }
 
         std::cerr << "accepted\n";
-        auto p = std::make_shared<peer>(std::move(*peer_socket), true);
-        p->start();
+        st->active_peer = std::make_shared<peer>(std::move(st->pending_socket), true);
+        st->active_peer->start();
     });
 }
 

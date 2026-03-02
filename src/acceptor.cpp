@@ -4,37 +4,42 @@ using namespace asio_utp;
 
 acceptor::acceptor(asio::io_context& ioc)
     : _ex(ioc.get_executor())
-    , _listener(_ex)
 {}
 
 acceptor::acceptor(const asio::any_io_executor& ex)
     : _ex(ex)
-    , _listener(_ex)
 {}
 
 void acceptor::bind(const endpoint_type& ep, std::error_code& ec)
 {
-    if (_listener.is_open()) {
+    if (_is_open) {
         ec = asio::error::already_open;
         return;
     }
 
-    _listener.bind(ep, ec);
+    socket probe(_ex);
+    probe.bind(ep, ec);
     if (ec) return;
-    _local_endpoint = _listener.local_endpoint();
+    _local_endpoint = probe.local_endpoint();
+    probe.close();
+    _is_open = true;
 }
 
 acceptor::endpoint_type acceptor::local_endpoint() const
 {
-    return _listener.local_endpoint();
+    return _local_endpoint;
 }
 
 bool acceptor::is_open() const
 {
-    return _listener.is_open();
+    return _is_open;
 }
 
 void acceptor::close()
 {
-    _listener.close();
+    _is_open = false;
+    if (_pending_accept_socket) {
+        _pending_accept_socket->close();
+        _pending_accept_socket = nullptr;
+    }
 }

@@ -32,8 +32,9 @@ public:
 
 private:
     asio::any_io_executor _ex;
-    socket _listener;
     endpoint_type _local_endpoint;
+    socket* _pending_accept_socket = nullptr;
+    bool _is_open = false;
 };
 
 template<typename CompletionToken>
@@ -45,7 +46,7 @@ auto acceptor::async_accept(socket& peer, CompletionToken&& token)
             using handler_type = std::decay_t<decltype(completion_handler)>;
             auto h = std::make_shared<handler_type>(std::forward<decltype(completion_handler)>(completion_handler));
 
-            if (!_listener.is_open()) {
+            if (!_is_open) {
                 return asio::post(get_executor(), [h] { (*h)(asio::error::bad_descriptor); });
             }
 
@@ -53,19 +54,19 @@ auto acceptor::async_accept(socket& peer, CompletionToken&& token)
                 return asio::post(get_executor(), [h] { (*h)(asio::error::already_open); });
             }
 
-            _listener.do_accept({ get_executor(), [this, &peer, h](const std::error_code& ec) mutable {
+            std::error_code bind_ec;
+            peer.bind(_local_endpoint, bind_ec);
+            if (bind_ec) {
+                return asio::post(get_executor(), [h, bind_ec] { (*h)(bind_ec); });
+            }
+
+            _pending_accept_socket = &peer;
+            peer.do_accept({ get_executor(), [this, h](const std::error_code& ec) mutable {
+                _pending_accept_socket = nullptr;
                 if (ec) {
                     return (*h)(ec);
                 }
-
-                peer = std::move(_listener);
-
-                socket next(_ex);
-                std::error_code bind_ec;
-                next.bind(_local_endpoint, bind_ec);
-                _listener = std::move(next);
-
-                (*h)(bind_ec);
+                (*h)(ec);
             }});
         },
         token);
