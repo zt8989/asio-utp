@@ -1,22 +1,22 @@
 #pragma once
 
 #include <asio/ip/udp.hpp>
+#include <asio/post.hpp>
 #include <asio/buffers_iterator.hpp>
 #include "detail/handler.hpp"
-#include "detail/signal.hpp"
-#include "event.hpp"
 
 namespace asio_utp {
 
 class socket_impl;
 class udp_multiplexer;
+class acceptor;
 
 class socket {
 public:
     using endpoint_type = asio::ip::udp::endpoint;
     using executor_type = asio::io_context::executor_type;
-    using event_handler = std::function<void(socket_event, const std::error_code&)>;
-    using event_connection = Signal<void(socket_event, const std::error_code&)>::Connection;
+    using wait_type = asio::socket_base::wait_type;
+    using shutdown_type = asio::socket_base::shutdown_type;
 
 public:
     socket() = default;
@@ -37,9 +37,6 @@ public:
     template<typename CompletionToken>
     auto async_connect(const endpoint_type&, CompletionToken&&);
 
-    template<typename CompletionToken>
-    auto async_accept(CompletionToken&&);
-
     template< typename ConstBufferSequence
             , typename CompletionToken>
     auto async_write_some(const ConstBufferSequence&, CompletionToken&&);
@@ -48,15 +45,21 @@ public:
             , typename CompletionToken>
     auto async_read_some(const MutableBufferSequence&, CompletionToken&&);
 
+    template<typename CompletionToken>
+    auto async_wait(wait_type, CompletionToken&&);
+
     endpoint_type local_endpoint() const;
 
     endpoint_type remote_endpoint() const;
 
     bool is_open() const;
 
-    void close();
+    void shutdown(shutdown_type, std::error_code&);
 
-    event_connection on_event(event_handler);
+    template<typename CompletionToken>
+    auto async_shutdown(shutdown_type, CompletionToken&&);
+
+    void close();
 
     asio::any_io_executor get_executor()
     {
@@ -73,11 +76,13 @@ private:
     void do_accept (handler<>&&);
     void do_write  (handler<size_t>&&);
     void do_read   (handler<size_t>&&);
+    void do_wait   (wait_type, handler<>&&);
 
     std::vector<asio::const_buffer>* tx_buffers();
     std::vector<asio::mutable_buffer>* rx_buffers();
 
 private:
+    friend class acceptor;
     friend class socket_impl;
     asio::any_io_executor _ex;
     std::shared_ptr<socket_impl> _socket_impl;
@@ -90,17 +95,6 @@ auto socket::async_connect(const endpoint_type& ep, CompletionToken&& token)
     return asio::async_initiate<CompletionToken, void(asio::error_code)>(
         [this, ep](auto&& completion_handler) mutable {
             do_connect(ep, { get_executor(), std::forward<decltype(completion_handler)>(completion_handler) });
-        },
-        token);
-}
-
-template<typename CompletionToken>
-inline
-auto socket::async_accept(CompletionToken&& token)
-{
-    return asio::async_initiate<CompletionToken, void(asio::error_code)>(
-        [this](auto&& completion_handler) mutable {
-            do_accept({ get_executor(), std::forward<decltype(completion_handler)>(completion_handler) });
         },
         token);
 }
@@ -143,6 +137,32 @@ auto socket::async_read_some( const MutableBufferSequence& bufs
             }
 
             do_read({ get_executor(), std::forward<decltype(completion_handler)>(completion_handler) });
+        },
+        token);
+}
+
+template<typename CompletionToken>
+inline
+auto socket::async_wait(wait_type w, CompletionToken&& token)
+{
+    return asio::async_initiate<CompletionToken, void(asio::error_code)>(
+        [this, w](auto&& completion_handler) mutable {
+            do_wait(w, { get_executor(), std::forward<decltype(completion_handler)>(completion_handler) });
+        },
+        token);
+}
+
+template<typename CompletionToken>
+inline
+auto socket::async_shutdown(shutdown_type how, CompletionToken&& token)
+{
+    return asio::async_initiate<CompletionToken, void(asio::error_code)>(
+        [this, how](auto&& completion_handler) mutable {
+            std::error_code ec;
+            shutdown(how, ec);
+            asio::post(get_executor(), [h = std::forward<decltype(completion_handler)>(completion_handler), ec]() mutable {
+                h(ec);
+            });
         },
         token);
 }

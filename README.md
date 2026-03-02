@@ -12,10 +12,6 @@ requirements. Such as [`async_read`], [`async_write`], [`ssl::stream`], ...
 Also similar to Asio's TCP sockets, `utp::socket`'s `async` API supports
 callbacks, futures and coroutines as completion tokens.
 
-`utp::socket` also exposes a lightweight Reactor-style event stream via
-`socket::on_event(...)` while preserving the existing `async_*` API.
-Supported events are: `connected`, `writable`, `readable`, `eof`, `closed`.
-
 The `asio_utp::udp_multiplexer` can be used to perform non uTP sending and
 receiving of UDP datagrams.
 

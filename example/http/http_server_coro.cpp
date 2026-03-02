@@ -309,14 +309,14 @@ do_listen(
 {
     beast::error_code ec;
 
+    utp::acceptor acceptor(ioc);
+    acceptor.bind(endpoint, ec);
+    if(ec) fail(ec, "bind");
+
     for(;;)
     {
         utp::socket socket(ioc);
-        socket.bind(endpoint, ec);
-
-        if(ec) fail(ec, "bind");
-
-        socket.async_accept(yield[ec]);
+        acceptor.async_accept(socket, yield[ec]);
 
         if(ec)
             fail(ec, "accept");

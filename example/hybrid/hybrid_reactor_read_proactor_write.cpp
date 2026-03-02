@@ -32,13 +32,7 @@ struct peer : std::enable_shared_from_this<peer> {
 
     void start()
     {
-        auto self = shared_from_this();
-        conn = socket.on_event([self](utp::socket_event ev, const sys_ec& ec) {
-            self->on_event(ev, ec);
-        });
-        if (!read_inflight && socket.is_open()) {
-            start_read();
-        }
+        wait_read();
     }
 
     void send(std::string data)
@@ -53,23 +47,21 @@ struct peer : std::enable_shared_from_this<peer> {
     }
 
 private:
-    void on_event(utp::socket_event ev, const sys_ec& ec)
+    void wait_read()
     {
-        if (ev == utp::socket_event::connected) {
-            std::cerr << "connected\n";
-            return;
-        }
-
-        if (ev == utp::socket_event::writable || ev == utp::socket_event::readable) {
-            return;
-        }
-
-        if (ev == utp::socket_event::eof || ev == utp::socket_event::closed) {
-            std::cerr << "closed: " << ec.message() << "\n";
-            if (socket.is_open()) {
-                socket.close();
+        auto self = shared_from_this();
+        socket.async_wait(asio::socket_base::wait_read, [self](const sys_ec& ec) {
+            if (ec) {
+                std::cerr << "closed: " << ec.message() << "\n";
+                if (self->socket.is_open()) {
+                    self->socket.close();
+                }
+                return;
             }
-        }
+            if (!self->read_inflight && self->socket.is_open()) {
+                self->start_read();
+            }
+        });
     }
 
     void start_read()
@@ -90,8 +82,8 @@ private:
             if (self->echo) {
                 self->send(msg);
             }
-            if (self->socket.is_open() && !self->read_inflight) {
-                self->start_read();
+            if (self->socket.is_open()) {
+                self->wait_read();
             }
         });
     }
@@ -127,7 +119,6 @@ private:
 public:
     utp::socket socket;
     std::vector<char> read_buf;
-    utp::socket::event_connection conn;
     std::deque<std::string> pending_writes;
     bool read_inflight = false;
     bool write_inflight = false;
@@ -136,7 +127,7 @@ public:
 
 void run_server(asio::io_context& ioc, const ip::udp::endpoint& ep)
 {
-    auto listener = std::make_shared<utp::socket>(ioc);
+    auto listener = std::make_shared<utp::acceptor>(ioc);
     sys_ec ec;
     listener->bind(ep, ec);
     if (ec) {
@@ -145,14 +136,15 @@ void run_server(asio::io_context& ioc, const ip::udp::endpoint& ep)
 
     std::cerr << "listening on " << listener->local_endpoint() << "\n";
 
-    listener->async_accept([listener](const sys_ec& aec) mutable {
+    auto peer_socket = std::make_shared<utp::socket>(ioc);
+    listener->async_accept(*peer_socket, [listener, peer_socket](const sys_ec& aec) mutable {
         if (aec) {
             std::cerr << "accept failed: " << aec.message() << "\n";
             return;
         }
 
         std::cerr << "accepted\n";
-        auto p = std::make_shared<peer>(std::move(*listener), true);
+        auto p = std::make_shared<peer>(std::move(*peer_socket), true);
         p->start();
     });
 }

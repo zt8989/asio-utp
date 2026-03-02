@@ -92,11 +92,12 @@ void server( asio::io_context& ioc
 {
     assert(argc >= 3);
 
+    utp::acceptor a(ioc);
     utp::socket s(ioc);
 
     sys::error_code ec;
     auto ep = parse_endpoint(argv[2]);
-    s.bind(ep, ec);
+    a.bind(ep, ec);
 
     if (ec) {
         cerr << "Failed to bind on endpoint " << ep
@@ -104,8 +105,12 @@ void server( asio::io_context& ioc
         return;
     }
 
-    cerr << "Accepting on: " << s.local_endpoint() << endl;
-    s.async_accept(yield);
+    cerr << "Accepting on: " << a.local_endpoint() << endl;
+    a.async_accept(s, yield[ec]);
+    if (ec) {
+        cerr << "Accept failed ec:" << ec.message() << "\n";
+        return;
+    }
     cerr << "Accepted"  << endl;
 
     full_duplex_forward(move(s), yield);

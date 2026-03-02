@@ -79,18 +79,18 @@ bool socket::is_open() const {
     return _socket_impl && _socket_impl->is_open();
 }
 
+void socket::shutdown(shutdown_type, sys::error_code& ec)
+{
+    ec.clear();
+    close();
+}
+
 void socket::close()
 {
     if (!is_open()) return;
 
     _socket_impl->close();
     _socket_impl = nullptr;
-}
-
-socket::event_connection socket::on_event(event_handler h)
-{
-    if (!_socket_impl) return {};
-    return _socket_impl->on_event(std::move(h));
 }
 
 socket::~socket()
@@ -145,6 +145,15 @@ void socket::do_read(handler<size_t>&& h)
     }
 
     _socket_impl->do_read(std::move(h));
+}
+
+void socket::do_wait(wait_type w, handler<>&& h)
+{
+    if (!_socket_impl) {
+        return h.post(asio::error::bad_descriptor);
+    }
+
+    _socket_impl->do_wait(w, std::move(h));
 }
 
 std::vector<asio::const_buffer>* socket::tx_buffers()

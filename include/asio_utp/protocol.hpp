@@ -1,5 +1,6 @@
 #pragma once
 
+#include <asio_utp/acceptor.hpp>
 #include <asio_utp/socket.hpp>
 
 namespace asio_utp {
@@ -9,6 +10,7 @@ namespace asio_utp {
 class protocol {
 public:
     using endpoint = asio::ip::udp::endpoint;
+    using acceptor = ::asio_utp::acceptor;
     using socket = ::asio_utp::socket;
     using resolver = asio::ip::udp::resolver;
 };
