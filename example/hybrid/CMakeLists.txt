@@ -1,0 +1,3 @@
+file(GLOB hybrid_sources "./hybrid_reactor_read_proactor_write.cpp")
+add_executable(hybrid_reactor_read_proactor_write ${hybrid_sources})
+target_link_libraries(hybrid_reactor_read_proactor_write asio_utp asio_utp_static_asio)

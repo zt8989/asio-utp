@@ -4,17 +4,24 @@
 #include <util.hpp>
 #include <iostream>
 #include <thread>
+#include <utility>
 
 #include <asio_utp.hpp>
 #include <namespaces.hpp>
 #include <boost/asio/spawn.hpp>
 
-namespace sys = boost::system;
 namespace asio = boost::asio;
+namespace sys = boost::system;
 namespace ip = asio::ip;
 using udp = ip::udp;
 using namespace std;
 namespace utp = asio_utp;
+
+template<class Executor, class Function>
+inline void spawn_detached(Executor&& ex, Function&& fn)
+{
+    asio::spawn(std::forward<Executor>(ex), std::forward<Function>(fn), asio::detached);
+}
 
 BOOST_AUTO_TEST_SUITE(comm_tests)
 
@@ -41,20 +48,21 @@ BOOST_AUTO_TEST_CASE(comm_server_reads)
 {
     asio::io_context ioc;
 
+    utp::acceptor server_a(ioc);
     utp::socket server_s(ioc);
     utp::socket client_s(ioc);
 
     {
         sys::error_code ec1, ec2;
 
-        server_s.bind({ip::address_v4::loopback(), 0}, ec1);
+        server_a.bind({ip::address_v4::loopback(), 0}, ec1);
         client_s.bind({ip::address_v4::loopback(), 0}, ec2);
 
         BOOST_REQUIRE(!ec1);
         BOOST_REQUIRE(!ec2);
     }
 
-    auto server_ep = server_s.local_endpoint();
+    auto server_ep = server_a.local_endpoint();
 
     size_t end_count = 2;
 
@@ -67,9 +75,10 @@ BOOST_AUTO_TEST_CASE(comm_server_reads)
 
     string tx_msg = "test";
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
-        server_s.async_accept(yield[ec]);
+
+        server_a.async_accept(server_s, yield[ec]);
         BOOST_REQUIRE(!ec);
 
         string rx_msg(tx_msg.size(), '\0');
@@ -78,10 +87,11 @@ BOOST_AUTO_TEST_CASE(comm_server_reads)
         BOOST_REQUIRE_EQUAL(rx_msg, tx_msg);
 
         on_finish();
-    }, asio::detached);
+    });
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
+
         client_s.async_connect(server_ep, yield[ec]);
         BOOST_REQUIRE(!ec);
 
@@ -89,7 +99,7 @@ BOOST_AUTO_TEST_CASE(comm_server_reads)
         BOOST_REQUIRE(!ec);
 
         on_finish();
-    }, asio::detached);
+    });
 
     ioc.run();
 
@@ -101,20 +111,21 @@ BOOST_AUTO_TEST_CASE(comm_exchange)
 {
     asio::io_context ioc;
 
+    utp::acceptor server_a(ioc);
     utp::socket server_s(ioc);
     utp::socket client_s(ioc);
 
     {
         sys::error_code ec1, ec2;
 
-        server_s.bind({ip::address_v4::loopback(), 0}, ec1);
+        server_a.bind({ip::address_v4::loopback(), 0}, ec1);
         client_s.bind({ip::address_v4::loopback(), 0}, ec2);
 
         BOOST_REQUIRE(!ec1);
         BOOST_REQUIRE(!ec2);
     }
 
-    auto server_ep = server_s.local_endpoint();
+    auto server_ep = server_a.local_endpoint();
 
     size_t end_count = 2;
 
@@ -124,10 +135,10 @@ BOOST_AUTO_TEST_CASE(comm_exchange)
         server_s.close();
     };
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
-        server_s.async_accept(yield[ec]);
+        server_a.async_accept(server_s, yield[ec]);
         BOOST_REQUIRE(!ec);
 
         string rx_msg(256, '\0');
@@ -141,9 +152,9 @@ BOOST_AUTO_TEST_CASE(comm_exchange)
         BOOST_REQUIRE(!ec);
 
         on_finish();
-    }, asio::detached);
+    });
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         client_s.async_connect(server_ep, yield[ec]);
@@ -159,7 +170,7 @@ BOOST_AUTO_TEST_CASE(comm_exchange)
         BOOST_REQUIRE_EQUAL(rx_msg.substr(0, size), "hello from server");
 
         on_finish();
-    }, asio::detached);
+    });
 
     ioc.run();
 
@@ -171,20 +182,21 @@ BOOST_AUTO_TEST_CASE(comm_test2)
 {
     asio::io_context ioc;
 
+    utp::acceptor server_a(ioc);
     utp::socket server_s(ioc);
     utp::socket client_s(ioc);
 
     {
         sys::error_code ec1, ec2;
 
-        server_s.bind({ip::address_v4::loopback(), 0}, ec1);
+        server_a.bind({ip::address_v4::loopback(), 0}, ec1);
         client_s.bind({ip::address_v4::loopback(), 0}, ec2);
 
         BOOST_REQUIRE(!ec1);
         BOOST_REQUIRE(!ec2);
     }
 
-    auto server_ep = server_s.local_endpoint();
+    auto server_ep = server_a.local_endpoint();
 
     size_t end_count = 2;
 
@@ -194,10 +206,10 @@ BOOST_AUTO_TEST_CASE(comm_test2)
         server_s.close();
     };
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
-        server_s.async_accept(yield[ec]);
+        server_a.async_accept(server_s, yield[ec]);
         BOOST_REQUIRE(!ec);
 
         vector<string> expect({"aa", "bb", "cc"});
@@ -210,9 +222,9 @@ BOOST_AUTO_TEST_CASE(comm_test2)
         }
 
         on_finish();
-    }, asio::detached);
+    });
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         client_s.async_connect(server_ep, yield[ec]);
@@ -223,7 +235,7 @@ BOOST_AUTO_TEST_CASE(comm_test2)
         BOOST_REQUIRE(!ec);
 
         on_finish();
-    }, asio::detached);
+    });
 
     ioc.run();
 
@@ -251,32 +263,34 @@ BOOST_AUTO_TEST_CASE(comm_same_endpoint_multiplex)
 {
     asio::io_context ioc;
 
+    utp::acceptor server1_a(ioc);
+    utp::acceptor server2_a(ioc);
     utp::socket server1(ioc);
     utp::socket server2(ioc);
 
     {
         sys::error_code ec1, ec2;
 
-        server1.bind({ip::address_v4::loopback(), 0}, ec1);
+        server1_a.bind({ip::address_v4::loopback(), 0}, ec1);
         BOOST_REQUIRE(!ec1);
 
-        server2.bind(server1.local_endpoint(), ec2);
+        server2_a.bind(server1_a.local_endpoint(), ec2);
         BOOST_REQUIRE(!ec2);
     }
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
-        server1.async_accept(yield[ec]);
+        server1_a.async_accept(server1, yield[ec]);
         BOOST_REQUIRE(!ec);
 
-        server2.async_accept(yield[ec]);
+        server2_a.async_accept(server2, yield[ec]);
         BOOST_REQUIRE(!ec);
         server1.close();
         server2.close();
-    }, asio::detached);
+    });
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         utp::socket client1(ioc);
@@ -292,12 +306,12 @@ BOOST_AUTO_TEST_CASE(comm_same_endpoint_multiplex)
             BOOST_REQUIRE(!ec2);
         }
 
-        client1.async_connect(server1.local_endpoint(), yield[ec]);
+        client1.async_connect(server1_a.local_endpoint(), yield[ec]);
         BOOST_REQUIRE(!ec);
 
-        client2.async_connect(server1.local_endpoint(), yield[ec]);
+        client2.async_connect(server1_a.local_endpoint(), yield[ec]);
         BOOST_REQUIRE(!ec);
-    }, asio::detached);
+    });
 
     ioc.run();
 }
@@ -309,20 +323,21 @@ BOOST_AUTO_TEST_CASE(comm_send_large_data)
 {
     asio::io_context ioc;
 
+    utp::acceptor server_a(ioc);
     utp::socket server_s(ioc);
     utp::socket client_s(ioc);
 
     {
         sys::error_code ec1, ec2;
 
-        server_s.bind({ip::address_v4::loopback(), 0}, ec1);
+        server_a.bind({ip::address_v4::loopback(), 0}, ec1);
         BOOST_REQUIRE(!ec1);
 
         client_s.bind({ip::address_v4::loopback(), 0}, ec2);
         BOOST_REQUIRE(!ec2);
     }
 
-    auto server_ep = server_s.local_endpoint();
+    auto server_ep = server_a.local_endpoint();
 
     srand(time(nullptr));
 
@@ -332,10 +347,10 @@ BOOST_AUTO_TEST_CASE(comm_send_large_data)
         data[i] = uint8_t(i % 256);
     }
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
-        server_s.async_accept(yield[ec]);
+        server_a.async_accept(server_s, yield[ec]);
         BOOST_REQUIRE(!ec);
 
         string rx_msg(256, '\0');
@@ -353,9 +368,9 @@ BOOST_AUTO_TEST_CASE(comm_send_large_data)
         server_s.async_read_some(buffer(rx_msg), yield[ec]);
         BOOST_REQUIRE_EQUAL(ec, asio::error::connection_reset);
         //server_s.close();
-    }, asio::detached);
+    });
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         client_s.async_connect(server_ep, yield[ec]);
@@ -376,7 +391,7 @@ BOOST_AUTO_TEST_CASE(comm_send_large_data)
         }
 
         client_s.close();
-    }, asio::detached);
+    });
 
     ioc.run();
 }
@@ -386,25 +401,26 @@ BOOST_AUTO_TEST_CASE(comm_abort_accept)
 {
     asio::io_context ioc;
 
+    utp::acceptor acceptor(ioc);
     utp::socket socket(ioc);
 
     {
         sys::error_code ec;
-        socket.bind({ip::address_v4::loopback(), 0}, ec);
+        acceptor.bind({ip::address_v4::loopback(), 0}, ec);
         BOOST_REQUIRE(!ec);
     }
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
-        asio::spawn(ioc, [&socket, &ioc] (asio::yield_context yield) {
+        spawn_detached(ioc, [&acceptor, &ioc] (asio::yield_context yield) {
             asio::post(ioc, yield); // So that closing happens _after_ the accept
-            socket.close();
-        }, asio::detached);
+            acceptor.close();
+        });
 
-        socket.async_accept(yield[ec]);
+        acceptor.async_accept(socket, yield[ec]);
         BOOST_REQUIRE_EQUAL(ec, asio::error::operation_aborted);
-    }, asio::detached);
+    });
 
     ioc.run();
 }
@@ -415,31 +431,31 @@ BOOST_AUTO_TEST_CASE(comm_abort_connect)
     asio::io_context ioc;
 
     utp::socket client_s(ioc);
-    utp::socket server_s(ioc);
+    utp::acceptor server_a(ioc);
 
     {
         sys::error_code ec1, ec2;
 
-        server_s.bind({ip::address_v4::loopback(), 0}, ec1);
+        server_a.bind({ip::address_v4::loopback(), 0}, ec1);
         BOOST_REQUIRE(!ec1);
 
         client_s.bind({ip::address_v4::loopback(), 0}, ec2);
         BOOST_REQUIRE(!ec2);
     }
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
-        asio::spawn(ioc, [&client_s, &ioc] (asio::yield_context yield) {
+        spawn_detached(ioc, [&client_s, &ioc] (asio::yield_context yield) {
             asio::post(ioc, yield); // So that closing happens _after_ the accept
             client_s.close();
-        }, asio::detached);
+        });
 
-        client_s.async_connect(server_s.local_endpoint(), yield[ec]);
+        client_s.async_connect(server_a.local_endpoint(), yield[ec]);
         BOOST_REQUIRE_EQUAL(ec, asio::error::operation_aborted);
 
-        server_s.close();
-    }, asio::detached);
+        server_a.close();
+    });
 
     ioc.run();
 }
@@ -449,20 +465,21 @@ BOOST_AUTO_TEST_CASE(comm_abort_recv)
 {
     asio::io_context ioc;
 
+    utp::acceptor server_a(ioc);
     utp::socket server_s(ioc);
     utp::socket client_s(ioc);
 
     {
         sys::error_code ec1, ec2;
 
-        server_s.bind({ip::address_v4::loopback(), 0}, ec1);
+        server_a.bind({ip::address_v4::loopback(), 0}, ec1);
         BOOST_REQUIRE(!ec1);
 
         client_s.bind({ip::address_v4::loopback(), 0}, ec2);
         BOOST_REQUIRE(!ec2);
     }
 
-    auto server_ep = server_s.local_endpoint();
+    auto server_ep = server_a.local_endpoint();
 
     size_t end_count = 2;
 
@@ -472,41 +489,41 @@ BOOST_AUTO_TEST_CASE(comm_abort_recv)
         server_s.close();
     };
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
-        server_s.async_accept(yield[ec]);
+        server_a.async_accept(server_s, yield[ec]);
         BOOST_REQUIRE(!ec);
 
-        asio::spawn(ioc, [&server_s, &ioc](asio::yield_context yield) {
+        spawn_detached(ioc, [&server_s, &ioc](asio::yield_context yield) {
             asio::post(ioc, yield);
             server_s.close();
-        }, asio::detached);
+        });
 
         string rx_msg(256, '\0');
         server_s.async_read_some(buffer(rx_msg), yield[ec]);
         BOOST_REQUIRE_EQUAL(ec, asio::error::operation_aborted);
 
         on_finish();
-    }, asio::detached);
+    });
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         client_s.async_connect(server_ep, yield[ec]);
         BOOST_REQUIRE(!ec);
 
-        asio::spawn(ioc, [&client_s, &ioc](asio::yield_context yield) {
+        spawn_detached(ioc, [&client_s, &ioc](asio::yield_context yield) {
             asio::post(ioc, yield);
             client_s.close();
-        }, asio::detached);
+        });
 
         string rx_msg(256, '\0');
         client_s.async_read_some(buffer(rx_msg), yield[ec]);
         BOOST_REQUIRE_EQUAL(ec, asio::error::operation_aborted);
 
         on_finish();
-    }, asio::detached);
+    });
 
     ioc.run();
 
@@ -536,40 +553,41 @@ BOOST_AUTO_TEST_CASE(comm_server_eof)
 {
     asio::io_context ioc;
 
+    utp::acceptor server_a(ioc);
     utp::socket server_s(ioc);
     utp::socket client_s(ioc);
 
     {
         sys::error_code ec1, ec2;
 
-        server_s.bind({ip::address_v4::loopback(), 0}, ec1);
+        server_a.bind({ip::address_v4::loopback(), 0}, ec1);
         BOOST_REQUIRE(!ec1);
 
         client_s.bind({ip::address_v4::loopback(), 0}, ec2);
         BOOST_REQUIRE(!ec2);
     }
 
-    auto server_ep = server_s.local_endpoint();
+    auto server_ep = server_a.local_endpoint();
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
-        server_s.async_accept(yield[ec]);
+        server_a.async_accept(server_s, yield[ec]);
         BOOST_REQUIRE(!ec);
 
         string rx_msg(256, '\0');
         server_s.async_read_some(buffer(rx_msg), yield[ec]);
         BOOST_REQUIRE_EQUAL(ec, asio::error::connection_reset);
-    }, asio::detached);
+    });
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         client_s.async_connect(server_ep, yield[ec]);
         BOOST_REQUIRE(!ec);
 
         client_s.close();
-    }, asio::detached);
+    });
 
     ioc.run();
 }
@@ -578,34 +596,35 @@ BOOST_AUTO_TEST_CASE(comm_client_eof)
 {
     asio::io_context ioc;
 
+    utp::acceptor server_a(ioc);
     utp::socket server_s(ioc);
     utp::socket client_s(ioc);
 
     {
         sys::error_code ec1, ec2;
 
-        server_s.bind({ip::address_v4::loopback(), 0}, ec1);
+        server_a.bind({ip::address_v4::loopback(), 0}, ec1);
         BOOST_REQUIRE(!ec1);
 
         client_s.bind({ip::address_v4::loopback(), 0}, ec2);
         BOOST_REQUIRE(!ec2);
     }
 
-    auto server_ep = server_s.local_endpoint();
+    auto server_ep = server_a.local_endpoint();
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
-        server_s.async_accept(yield[ec]);
+        server_a.async_accept(server_s, yield[ec]);
         BOOST_REQUIRE(!ec);
 
         string msg(256, '\0');
         server_s.async_read_some(buffer(msg), yield[ec]);
 
         server_s.close();
-    }, asio::detached);
+    });
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         client_s.async_connect(server_ep, yield[ec]);
@@ -619,7 +638,7 @@ BOOST_AUTO_TEST_CASE(comm_client_eof)
 
         client_s.async_read_some(buffer(msg), yield[ec]);
         BOOST_REQUIRE_EQUAL(ec, asio::error::connection_reset);
-    }, asio::detached);
+    });
 
     ioc.run();
 }

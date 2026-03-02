@@ -59,6 +59,7 @@ private:
 
     void do_write(handler<size_t>);
     void do_read(handler<size_t>);
+    void do_wait(asio::socket_base::wait_type, handler<>);
     void do_connect(const endpoint_type&, handler<>);
     void do_accept(handler<>);
 
@@ -88,6 +89,9 @@ private:
 
     handler<> _connect_handler;
     handler<> _accept_handler;
+    handler<> _wait_read_handler;
+    handler<> _wait_write_handler;
+    handler<> _wait_error_handler;
     handler<size_t> _send_handler;
     handler<size_t> _recv_handler;
 

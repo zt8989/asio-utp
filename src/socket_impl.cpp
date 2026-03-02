@@ -54,6 +54,9 @@ void socket_impl::bind(const udp_multiplexer& m)
 
 void socket_impl::on_connect()
 {
+    if (_wait_write_handler) {
+        post_op(_wait_write_handler, "wait_write", sys::error_code());
+    }
     post_op(_connect_handler, "connect", sys::error_code());
 }
 
@@ -73,6 +76,9 @@ void socket_impl::on_receive(const unsigned char* buf, size_t size)
 
     if (!_recv_handler) {
         _rx_buffer_queue.push_back({buf, buf+size});
+        if (_wait_read_handler) {
+            post_op(_wait_read_handler, "wait_read", sys::error_code());
+        }
         return;
     }
 
@@ -101,6 +107,9 @@ void socket_impl::on_receive(const unsigned char* buf, size_t size)
         utp_read_drained((utp_socket*) _utp_socket);
     }
 
+    if (_wait_read_handler) {
+        post_op(_wait_read_handler, "wait_read", sys::error_code());
+    }
     post_op(_recv_handler, "recv", sys::error_code(), total);
 }
 
@@ -196,8 +205,44 @@ void socket_impl::on_writable()
         log(this, " socket_impl::on_writable");
     }
 
+    if (_wait_write_handler) {
+        post_op(_wait_write_handler, "wait_write", sys::error_code());
+    }
     if (!_send_handler) return;
     do_write(move(_send_handler));
+}
+
+void socket_impl::do_wait(asio::socket_base::wait_type w, handler<> h)
+{
+    if (!is_open()) {
+        return h.post(asio::error::bad_descriptor);
+    }
+
+    if (w == asio::socket_base::wait_read) {
+        if (!_rx_buffer_queue.empty() || _got_eof) {
+            return h.post(sys::error_code());
+        }
+        assert(!_wait_read_handler);
+        return setup_op(_wait_read_handler, move(h), "wait_read");
+    }
+
+    if (w == asio::socket_base::wait_write) {
+        if (_utp_socket && !_connect_handler) {
+            return h.post(sys::error_code());
+        }
+        assert(!_wait_write_handler);
+        return setup_op(_wait_write_handler, move(h), "wait_write");
+    }
+
+    if (w == asio::socket_base::wait_error) {
+        if (_got_eof || _closed) {
+            return h.post(sys::error_code());
+        }
+        assert(!_wait_error_handler);
+        return setup_op(_wait_error_handler, move(h), "wait_error");
+    }
+
+    h.post(asio::error::invalid_argument);
 }
 
 void socket_impl::do_read(handler<size_t> h)
@@ -304,6 +349,12 @@ void socket_impl::on_eof()
 
     assert(!_got_eof);
     _got_eof = true;
+    if (_wait_read_handler) {
+        post_op(_wait_read_handler, "wait_read", sys::error_code());
+    }
+    if (_wait_error_handler) {
+        post_op(_wait_error_handler, "wait_error", sys::error_code());
+    }
 
     if (_recv_handler) {
         post_op(_recv_handler, "recv", asio::error::connection_reset, 0);
@@ -370,6 +421,18 @@ void socket_impl::close_with_error(const sys::error_code& ec)
 
     if (_send_handler) {
         post_op(_send_handler, "send", ec, 0);
+    }
+
+    if (_wait_read_handler) {
+        post_op(_wait_read_handler, "wait_read", ec);
+    }
+
+    if (_wait_write_handler) {
+        post_op(_wait_write_handler, "wait_write", ec);
+    }
+
+    if (_wait_error_handler) {
+        post_op(_wait_error_handler, "wait_error", ec);
     }
 
     auto s = (utp_socket*) _utp_socket;

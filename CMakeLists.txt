@@ -87,6 +87,7 @@ target_compile_definitions(asio_utp_static_asio
 if(ASIO_UTP_WITH_EXAMPLES)
     # Boost.Beast example
     add_subdirectory(example/http)
+    add_subdirectory(example/hybrid)
     add_subdirectory(example/ucat)
 endif() # ASIO_UTP_WITH_EXAMPLES
 

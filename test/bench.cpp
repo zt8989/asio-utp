@@ -177,10 +177,13 @@ template<> struct Async<utp::protocol> {
         auto local_ep = parse_endpoint<utp::protocol>(local_ep_s);
     
         boost::system::error_code ec;
-        utp::socket socket(ioc);
-        socket.bind(local_ep, ec);
+        utp::acceptor acceptor(ioc);
+        acceptor.bind(local_ep, ec);
         assert(!ec);
-        socket.async_accept(yield);
+
+        utp::socket socket(ioc);
+        acceptor.async_accept(socket, yield[ec]);
+        assert(!ec);
     
         return socket;
     }
