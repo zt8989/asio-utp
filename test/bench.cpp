@@ -11,8 +11,8 @@
 #include <asio/spawn.hpp>
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int.hpp>
-#include <boost/utility/string_view.hpp>
 #include <asio_utp.hpp>
+#include <utility>
 
 using namespace std;
 namespace utp = asio_utp;
@@ -20,9 +20,13 @@ namespace rnd = boost::random;
 using asio::ip::tcp;
 using asio::ip::udp;
 using Clock = std::chrono::steady_clock;
-using string_view = boost::string_view;
-
 enum class Type { client, server };
+
+template<class Executor, class Function>
+inline void spawn_detached(Executor&& ex, Function&& fn)
+{
+    asio::spawn(std::forward<Executor>(ex), std::forward<Function>(fn), asio::detached);
+}
 
 float seconds(Clock::duration d) {
     using namespace std::chrono;
@@ -30,7 +34,7 @@ float seconds(Clock::duration d) {
 }
 
 template<class Proto>
-typename Proto::endpoint parse_endpoint(const string_view s)
+typename Proto::endpoint parse_endpoint(const std::string& s)
 {
     auto pos = s.find(':');
 
@@ -40,8 +44,8 @@ typename Proto::endpoint parse_endpoint(const string_view s)
         throw runtime_error(ss.str());
     }
 
-    auto addr = asio::ip::address::from_string(s.substr(0, pos).to_string());
-    uint16_t port = std::atoi(s.substr(pos+1).data());
+    auto addr = asio::ip::make_address(s.substr(0, pos));
+    uint16_t port = static_cast<uint16_t>(std::atoi(s.substr(pos + 1).c_str()));
     return {addr, port};
 }
 
@@ -137,7 +141,7 @@ void send(Socket& s, Type type, asio::yield_context yield)
 
 template<typename Proto>
 typename Proto::socket connect( asio::io_context& ioc
-                              , string_view remote_ep_s
+                              , const std::string& remote_ep_s
                               , asio::yield_context yield)
 {
     auto remote_ep = parse_endpoint<Proto>(remote_ep_s);
@@ -154,7 +158,7 @@ template<typename Proto> struct Async;
 template<> struct Async<tcp> {
     static
     tcp::socket accept( asio::io_context& ioc
-                      , string_view local_ep_s
+                      , const std::string& local_ep_s
                       , asio::yield_context yield)
     {
         auto local_ep = parse_endpoint<tcp>(local_ep_s);
@@ -170,7 +174,7 @@ template<> struct Async<tcp> {
 template<> struct Async<utp::protocol> {
     static
     utp::socket accept( asio::io_context& ioc
-                      , string_view local_ep_s
+                      , const std::string& local_ep_s
                       , asio::yield_context yield)
     {
         auto local_ep = parse_endpoint<utp::protocol>(local_ep_s);
@@ -187,7 +191,7 @@ template<> struct Async<utp::protocol> {
 
 template<class Proto>
 void server( asio::io_context& ioc
-           , string_view local_ep_s
+           , const std::string& local_ep_s
            , asio::yield_context yield)
 {
     cout << "Accepting..." << endl;
@@ -199,7 +203,7 @@ void server( asio::io_context& ioc
 
 template<class Proto>
 void client( asio::io_context& ioc
-           , string_view remote_ep_s
+           , const std::string& remote_ep_s
            , asio::yield_context yield)
 {
     cout << "Connecting..." << endl;
@@ -248,7 +252,7 @@ int main(int argc, const char** argv)
     try {
         asio::io_context ioc(1);
 
-        asio::spawn(ioc, [&] (asio::yield_context yield) {
+        spawn_detached(ioc, [&] (asio::yield_context yield) {
                 if (proto == "tcp") {
                     if (type == Type::client) {
                         client<tcp>(ioc, endpoint, yield);

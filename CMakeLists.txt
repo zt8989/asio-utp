@@ -4,6 +4,7 @@ include(ExternalProject)
 
 option(ASIO_UTP_WITH_TESTS    "Build tests" ON)
 option(ASIO_UTP_WITH_EXAMPLES "Build examples" ON)
+option(ASIO_UTP_WITH_HTTP_EXAMPLES "Build Boost.Beast HTTP examples" OFF)
 option(ASIO_UTP_DEBUG_LOGGING "Enable debug logging from asio_utp" OFF)
 option(UTP_DEBUG_LOGGING      "Enable debug logging from libutp" OFF)
 
@@ -92,9 +93,10 @@ target_compile_definitions(asio_utp_static_asio
 
 #---------------------------------------------------------------------
 if(ASIO_UTP_WITH_EXAMPLES)
-    # Boost.Beast example
-    add_subdirectory(example/http)
     add_subdirectory(example/ucat)
+    if(ASIO_UTP_WITH_HTTP_EXAMPLES)
+        add_subdirectory(example/http)
+    endif()
 endif() # ASIO_UTP_WITH_EXAMPLES
 
 #---------------------------------------------------------------------

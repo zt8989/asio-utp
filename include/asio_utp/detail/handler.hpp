@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <system_error>
+#include <type_traits>
 #include <utility>
 
 namespace asio_utp {
@@ -90,7 +91,7 @@ public:
                    ( func
                    , std::allocator<void>());
 
-        using impl_t = impl<decltype(e), decltype(a), Func>;
+        using impl_t = impl<decltype(e), decltype(a), typename std::decay<Func>::type>;
 
         // XXX: allocate `impl` using `a`
         _impl = std::make_unique<impl_t>( std::move(e)

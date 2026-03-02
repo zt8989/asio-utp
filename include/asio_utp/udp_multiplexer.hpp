@@ -88,22 +88,19 @@ auto udp_multiplexer::async_receive_from( const MutableBufferSequence& bufs
                                         , endpoint_type& ep
                                         , CompletionToken&& token)
 {
-    if (auto rx_bufs = rx_buffers()) {
-        rx_bufs->clear();
+    return asio::async_initiate<CompletionToken, void(asio::error_code, size_t)>(
+        [this, &bufs, &ep](auto&& completion_handler) mutable {
+            if (auto rx_bufs = rx_buffers()) {
+                rx_bufs->clear();
 
-        std::copy( asio::buffer_sequence_begin(bufs)
-                 , asio::buffer_sequence_end(bufs)
-                 , std::back_inserter(*rx_bufs));
-    }
+                std::copy( asio::buffer_sequence_begin(bufs)
+                         , asio::buffer_sequence_end(bufs)
+                         , std::back_inserter(*rx_bufs));
+            }
 
-    asio::async_completion
-        < CompletionToken
-        , void(std::error_code, size_t)
-        > c(token);
-
-    do_receive(ep, {get_executor(), std::move(c.completion_handler)});
-
-    return c.result.get();
+            do_receive(ep, { get_executor(), std::forward<decltype(completion_handler)>(completion_handler) });
+        },
+        token);
 }
 
 template< typename ConstBufferSequence
@@ -113,22 +110,19 @@ auto udp_multiplexer::async_send_to( const ConstBufferSequence& bufs
                                    , const endpoint_type& destination
                                    , CompletionToken&& token)
 {
-    if (auto tx_bufs = tx_buffers()) {
-        tx_bufs->clear();
+    return asio::async_initiate<CompletionToken, void(asio::error_code, size_t)>(
+        [this, &bufs, destination](auto&& completion_handler) mutable {
+            if (auto tx_bufs = tx_buffers()) {
+                tx_bufs->clear();
 
-        std::copy( asio::buffer_sequence_begin(bufs)
-                 , asio::buffer_sequence_end(bufs)
-                 , std::back_inserter(*tx_bufs));
-    }
+                std::copy( asio::buffer_sequence_begin(bufs)
+                         , asio::buffer_sequence_end(bufs)
+                         , std::back_inserter(*tx_bufs));
+            }
 
-    asio::async_completion
-        < CompletionToken
-        , void(std::error_code, size_t)
-        > c(token);
-
-    do_send(destination, {get_executor(), std::move(c.completion_handler)});
-
-    return c.result.get();
+            do_send(destination, { get_executor(), std::forward<decltype(completion_handler)>(completion_handler) });
+        },
+        token);
 }
 
 } // asio_utp

@@ -31,10 +31,10 @@ public:
     void bind(const udp_multiplexer&, std::error_code&);
 
     template<typename CompletionToken>
-    void async_connect(const endpoint_type&, CompletionToken&&);
+    auto async_connect(const endpoint_type&, CompletionToken&&);
 
     template<typename CompletionToken>
-    void async_accept(CompletionToken&&);
+    auto async_accept(CompletionToken&&);
 
     template< typename ConstBufferSequence
             , typename CompletionToken>
@@ -79,26 +79,24 @@ private:
 
 template<typename CompletionToken>
 inline
-void socket::async_connect(const endpoint_type& ep, CompletionToken&& token)
+auto socket::async_connect(const endpoint_type& ep, CompletionToken&& token)
 {
-    asio::async_completion
-        <CompletionToken, void(std::error_code)> c(token);
-
-    do_connect(ep, {get_executor(), std::move(c.completion_handler)});
-
-    return c.result.get();
+    return asio::async_initiate<CompletionToken, void(asio::error_code)>(
+        [this, ep](auto&& completion_handler) mutable {
+            do_connect(ep, { get_executor(), std::forward<decltype(completion_handler)>(completion_handler) });
+        },
+        token);
 }
 
 template<typename CompletionToken>
 inline
-void socket::async_accept(CompletionToken&& token)
+auto socket::async_accept(CompletionToken&& token)
 {
-    asio::async_completion
-        <CompletionToken, void(std::error_code)> c(token);
-
-    do_accept({get_executor(), std::move(c.completion_handler)});
-
-    return c.result.get();
+    return asio::async_initiate<CompletionToken, void(asio::error_code)>(
+        [this](auto&& completion_handler) mutable {
+            do_accept({ get_executor(), std::forward<decltype(completion_handler)>(completion_handler) });
+        },
+        token);
 }
 
 template< typename ConstBufferSequence
@@ -107,22 +105,19 @@ inline
 auto socket::async_write_some( const ConstBufferSequence& bufs
                              , CompletionToken&& token)
 {
-    if (auto txb = tx_buffers()) {
-        txb->clear();
+    return asio::async_initiate<CompletionToken, void(asio::error_code, size_t)>(
+        [this, &bufs](auto&& completion_handler) mutable {
+            if (auto txb = tx_buffers()) {
+                txb->clear();
 
-        std::copy( asio::buffer_sequence_begin(bufs)
-                 , asio::buffer_sequence_end(bufs)
-                 , std::back_inserter(*txb));
-    }
+                std::copy( asio::buffer_sequence_begin(bufs)
+                         , asio::buffer_sequence_end(bufs)
+                         , std::back_inserter(*txb));
+            }
 
-    asio::async_completion
-        < CompletionToken
-        , void(std::error_code, size_t)
-        > c(token);
-
-    do_write({get_executor(), std::move(c.completion_handler)});
-
-    return c.result.get();
+            do_write({ get_executor(), std::forward<decltype(completion_handler)>(completion_handler) });
+        },
+        token);
 }
 
 template< typename MutableBufferSequence
@@ -131,22 +126,19 @@ inline
 auto socket::async_read_some( const MutableBufferSequence& bufs
                             , CompletionToken&& token)
 {
-    if (auto rxb = rx_buffers()) {
-        rxb->clear();
+    return asio::async_initiate<CompletionToken, void(asio::error_code, size_t)>(
+        [this, &bufs](auto&& completion_handler) mutable {
+            if (auto rxb = rx_buffers()) {
+                rxb->clear();
 
-        std::copy( asio::buffer_sequence_begin(bufs)
-                 , asio::buffer_sequence_end(bufs)
-                 , std::back_inserter(*rxb));
-    }
+                std::copy( asio::buffer_sequence_begin(bufs)
+                         , asio::buffer_sequence_end(bufs)
+                         , std::back_inserter(*rxb));
+            }
 
-    asio::async_completion
-        < CompletionToken
-        , void(std::error_code, size_t)
-        > c(token);
-
-    do_read({get_executor(), std::move(c.completion_handler)});
-
-    return c.result.get();
+            do_read({ get_executor(), std::forward<decltype(completion_handler)>(completion_handler) });
+        },
+        token);
 }
 
 } // namespace

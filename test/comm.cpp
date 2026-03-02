@@ -4,6 +4,7 @@
 #include <util.hpp>
 #include <iostream>
 #include <thread>
+#include <utility>
 
 #include <asio_utp.hpp>
 #include <namespaces.hpp>
@@ -15,9 +16,15 @@ using udp = ip::udp;
 using namespace std;
 namespace utp = asio_utp;
 
+template<class Executor, class Function>
+inline void spawn_detached(Executor&& ex, Function&& fn)
+{
+    asio::spawn(std::forward<Executor>(ex), std::forward<Function>(fn), asio::detached);
+}
+
 BOOST_AUTO_TEST_SUITE(comm_tests)
 
-static asio::mutable_buffers_1 buffer(std::string& s) {
+static asio::mutable_buffer buffer(std::string& s) {
     return asio::buffer(const_cast<char*>(s.data()), s.size());
 }
 
@@ -66,7 +73,7 @@ BOOST_AUTO_TEST_CASE(comm_server_reads)
 
     string tx_msg = "test";
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         server_s.async_accept(yield[ec]);
@@ -80,7 +87,7 @@ BOOST_AUTO_TEST_CASE(comm_server_reads)
         on_finish();
     });
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         client_s.async_connect(server_ep, yield[ec]);
@@ -125,7 +132,7 @@ BOOST_AUTO_TEST_CASE(comm_exchange)
         server_s.close();
     };
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         server_s.async_accept(yield[ec]);
@@ -144,7 +151,7 @@ BOOST_AUTO_TEST_CASE(comm_exchange)
         on_finish();
     });
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         client_s.async_connect(server_ep, yield[ec]);
@@ -195,7 +202,7 @@ BOOST_AUTO_TEST_CASE(comm_test2)
         server_s.close();
     };
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         server_s.async_accept(yield[ec]);
@@ -213,7 +220,7 @@ BOOST_AUTO_TEST_CASE(comm_test2)
         on_finish();
     });
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         client_s.async_connect(server_ep, yield[ec]);
@@ -265,7 +272,7 @@ BOOST_AUTO_TEST_CASE(comm_same_endpoint_multiplex)
         BOOST_REQUIRE(!ec2);
     }
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         server1.async_accept(yield[ec]);
@@ -277,7 +284,7 @@ BOOST_AUTO_TEST_CASE(comm_same_endpoint_multiplex)
         server2.close();
     });
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         utp::socket client1(ioc);
@@ -333,7 +340,7 @@ BOOST_AUTO_TEST_CASE(comm_send_large_data)
         data[i] = uint8_t(i % 256);
     }
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         server_s.async_accept(yield[ec]);
@@ -356,7 +363,7 @@ BOOST_AUTO_TEST_CASE(comm_send_large_data)
         //server_s.close();
     });
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         client_s.async_connect(server_ep, yield[ec]);
@@ -395,11 +402,11 @@ BOOST_AUTO_TEST_CASE(comm_abort_accept)
         BOOST_REQUIRE(!ec);
     }
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
-        asio::spawn(ioc, [&socket, &ioc] (asio::yield_context yield) {
-            ioc.post(yield); // So that closing happens _after_ the accept
+        spawn_detached(ioc, [&socket, &ioc] (asio::yield_context yield) {
+            asio::post(ioc, yield); // So that closing happens _after_ the accept
             socket.close();
         });
 
@@ -428,11 +435,11 @@ BOOST_AUTO_TEST_CASE(comm_abort_connect)
         BOOST_REQUIRE(!ec2);
     }
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
-        asio::spawn(ioc, [&client_s, &ioc] (asio::yield_context yield) {
-            ioc.post(yield); // So that closing happens _after_ the accept
+        spawn_detached(ioc, [&client_s, &ioc] (asio::yield_context yield) {
+            asio::post(ioc, yield); // So that closing happens _after_ the accept
             client_s.close();
         });
 
@@ -473,14 +480,14 @@ BOOST_AUTO_TEST_CASE(comm_abort_recv)
         server_s.close();
     };
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         server_s.async_accept(yield[ec]);
         BOOST_REQUIRE(!ec);
 
-        asio::spawn(ioc, [&server_s, &ioc](asio::yield_context yield) {
-            ioc.post(yield);
+        spawn_detached(ioc, [&server_s, &ioc](asio::yield_context yield) {
+            asio::post(ioc, yield);
             server_s.close();
         });
 
@@ -491,14 +498,14 @@ BOOST_AUTO_TEST_CASE(comm_abort_recv)
         on_finish();
     });
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         client_s.async_connect(server_ep, yield[ec]);
         BOOST_REQUIRE(!ec);
 
-        asio::spawn(ioc, [&client_s, &ioc](asio::yield_context yield) {
-            ioc.post(yield);
+        spawn_detached(ioc, [&client_s, &ioc](asio::yield_context yield) {
+            asio::post(ioc, yield);
             client_s.close();
         });
 
@@ -552,7 +559,7 @@ BOOST_AUTO_TEST_CASE(comm_server_eof)
 
     auto server_ep = server_s.local_endpoint();
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         server_s.async_accept(yield[ec]);
@@ -563,7 +570,7 @@ BOOST_AUTO_TEST_CASE(comm_server_eof)
         BOOST_REQUIRE_EQUAL(ec, asio::error::connection_reset);
     });
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         client_s.async_connect(server_ep, yield[ec]);
@@ -594,7 +601,7 @@ BOOST_AUTO_TEST_CASE(comm_client_eof)
 
     auto server_ep = server_s.local_endpoint();
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         server_s.async_accept(yield[ec]);
@@ -606,7 +613,7 @@ BOOST_AUTO_TEST_CASE(comm_client_eof)
         server_s.close();
     });
 
-    asio::spawn(ioc, [&](asio::yield_context yield) {
+    spawn_detached(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
 
         client_s.async_connect(server_ep, yield[ec]);
