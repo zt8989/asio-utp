@@ -1,7 +1,7 @@
 #pragma once
 
-#include <boost/asio/ip/udp.hpp>
-#include <boost/asio/buffers_iterator.hpp>
+#include <asio/ip/udp.hpp>
+#include <asio/buffers_iterator.hpp>
 #include "detail/handler.hpp"
 
 namespace asio_utp {
@@ -11,8 +11,8 @@ class udp_multiplexer;
 
 class socket {
 public:
-    using endpoint_type = boost::asio::ip::udp::endpoint;
-    using executor_type = boost::asio::io_context::executor_type;
+    using endpoint_type = asio::ip::udp::endpoint;
+    using executor_type = asio::io_context::executor_type;
 
 public:
     socket() = default;
@@ -23,12 +23,12 @@ public:
     socket(socket&&);
     socket& operator=(socket&&);
 
-    socket(const boost::asio::executor&);
-    socket(boost::asio::io_context&);
+    socket(const asio::any_io_executor&);
+    socket(asio::io_context&);
 
-    void bind(const endpoint_type&, boost::system::error_code&);
+    void bind(const endpoint_type&, std::error_code&);
 
-    void bind(const udp_multiplexer&, boost::system::error_code&);
+    void bind(const udp_multiplexer&, std::error_code&);
 
     template<typename CompletionToken>
     void async_connect(const endpoint_type&, CompletionToken&&);
@@ -52,7 +52,7 @@ public:
 
     void close();
 
-    boost::asio::executor get_executor()
+    asio::any_io_executor get_executor()
     {
         return _ex;
     }
@@ -68,12 +68,12 @@ private:
     void do_write  (handler<size_t>&&);
     void do_read   (handler<size_t>&&);
 
-    std::vector<boost::asio::const_buffer>* tx_buffers();
-    std::vector<boost::asio::mutable_buffer>* rx_buffers();
+    std::vector<asio::const_buffer>* tx_buffers();
+    std::vector<asio::mutable_buffer>* rx_buffers();
 
 private:
     friend class socket_impl;
-    boost::asio::executor _ex;
+    asio::any_io_executor _ex;
     std::shared_ptr<socket_impl> _socket_impl;
 };
 
@@ -81,8 +81,8 @@ template<typename CompletionToken>
 inline
 void socket::async_connect(const endpoint_type& ep, CompletionToken&& token)
 {
-    boost::asio::async_completion
-        <CompletionToken, void(boost::system::error_code)> c(token);
+    asio::async_completion
+        <CompletionToken, void(std::error_code)> c(token);
 
     do_connect(ep, {get_executor(), std::move(c.completion_handler)});
 
@@ -93,8 +93,8 @@ template<typename CompletionToken>
 inline
 void socket::async_accept(CompletionToken&& token)
 {
-    boost::asio::async_completion
-        <CompletionToken, void(boost::system::error_code)> c(token);
+    asio::async_completion
+        <CompletionToken, void(std::error_code)> c(token);
 
     do_accept({get_executor(), std::move(c.completion_handler)});
 
@@ -110,14 +110,14 @@ auto socket::async_write_some( const ConstBufferSequence& bufs
     if (auto txb = tx_buffers()) {
         txb->clear();
 
-        std::copy( boost::asio::buffer_sequence_begin(bufs)
-                 , boost::asio::buffer_sequence_end(bufs)
+        std::copy( asio::buffer_sequence_begin(bufs)
+                 , asio::buffer_sequence_end(bufs)
                  , std::back_inserter(*txb));
     }
 
-    boost::asio::async_completion
+    asio::async_completion
         < CompletionToken
-        , void(boost::system::error_code, size_t)
+        , void(std::error_code, size_t)
         > c(token);
 
     do_write({get_executor(), std::move(c.completion_handler)});
@@ -134,14 +134,14 @@ auto socket::async_read_some( const MutableBufferSequence& bufs
     if (auto rxb = rx_buffers()) {
         rxb->clear();
 
-        std::copy( boost::asio::buffer_sequence_begin(bufs)
-                 , boost::asio::buffer_sequence_end(bufs)
+        std::copy( asio::buffer_sequence_begin(bufs)
+                 , asio::buffer_sequence_end(bufs)
                  , std::back_inserter(*rxb));
     }
 
-    boost::asio::async_completion
+    asio::async_completion
         < CompletionToken
-        , void(boost::system::error_code, size_t)
+        , void(std::error_code, size_t)
         > c(token);
 
     do_read({get_executor(), std::move(c.completion_handler)});

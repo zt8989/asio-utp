@@ -5,11 +5,11 @@
 using namespace std;
 using namespace asio_utp;
 
-socket::socket(boost::asio::io_context& ioc)
+socket::socket(asio::io_context& ioc)
     : _ex(ioc.get_executor())
 {}
 
-socket::socket(const boost::asio::executor& ex)
+socket::socket(const asio::any_io_executor& ex)
     : _ex(ex)
 {}
 
@@ -63,13 +63,13 @@ asio_utp::socket& socket::operator=(socket&& other)
     return *this;
 }
 
-boost::asio::ip::udp::endpoint socket::local_endpoint() const
+asio::ip::udp::endpoint socket::local_endpoint() const
 {
     assert(_socket_impl); // TODO: throw
     return _socket_impl->local_endpoint();
 }
 
-boost::asio::ip::udp::endpoint socket::remote_endpoint() const
+asio::ip::udp::endpoint socket::remote_endpoint() const
 {
     assert(_socket_impl); // TODO: throw
     return _socket_impl->remote_endpoint();
@@ -141,13 +141,13 @@ void socket::do_read(handler<size_t>&& h)
     _socket_impl->do_read(std::move(h));
 }
 
-std::vector<boost::asio::const_buffer>* socket::tx_buffers()
+std::vector<asio::const_buffer>* socket::tx_buffers()
 {
     if (!_socket_impl) return nullptr;
     return &_socket_impl->_tx_buffers;
 }
 
-std::vector<boost::asio::mutable_buffer>* socket::rx_buffers()
+std::vector<asio::mutable_buffer>* socket::rx_buffers()
 {
     if (!_socket_impl) return nullptr;
     return &_socket_impl->_rx_buffers;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <boost/asio/ip/udp.hpp>
+#include <asio/ip/udp.hpp>
 #include <asio_utp/detail/handler.hpp>
 #include <asio_utp/detail/signal.hpp>
 
@@ -14,13 +14,13 @@ private:
     struct state;
 
 public:
-    using endpoint_type = boost::asio::ip::udp::endpoint;
+    using endpoint_type = asio::ip::udp::endpoint;
 
     using on_send_to_handler = void(
-        const std::vector<boost::asio::const_buffer>&,
+        const std::vector<asio::const_buffer>&,
         size_t,
         const endpoint_type&,
-        boost::system::error_code
+        std::error_code
     );
     using on_send_to_connection = Signal<on_send_to_handler>::Connection;
 
@@ -33,11 +33,11 @@ public:
     udp_multiplexer(udp_multiplexer&&) = default;
     udp_multiplexer& operator=(udp_multiplexer&&) = default;
 
-    udp_multiplexer(boost::asio::io_context&);
-    udp_multiplexer(const boost::asio::executor&);
+    udp_multiplexer(asio::io_context&);
+    udp_multiplexer(const asio::any_io_executor&);
 
-    void bind(const endpoint_type& local_endpoint, boost::system::error_code&);
-    void bind(const udp_multiplexer&, boost::system::error_code&);
+    void bind(const endpoint_type& local_endpoint, std::error_code&);
+    void bind(const udp_multiplexer&, std::error_code&);
 
     template< typename MutableBufferSequence
             , typename CompletionToken>
@@ -53,7 +53,7 @@ public:
 
     on_send_to_connection on_send_to(std::function<on_send_to_handler> handler);
 
-    boost::asio::executor get_executor()
+    asio::any_io_executor get_executor()
     {
         return _ex;
     }
@@ -62,7 +62,7 @@ public:
 
     bool is_open() const;
 
-    void close(boost::system::error_code&);
+    void close(std::error_code&);
 
     ~udp_multiplexer();
 
@@ -70,14 +70,14 @@ private:
     void do_receive(endpoint_type& ep, handler<size_t>&&);
     void do_send(const endpoint_type& ep, handler<size_t>&&);
 
-    std::vector<boost::asio::mutable_buffer>* rx_buffers();
-    std::vector<boost::asio::const_buffer>*   tx_buffers();
+    std::vector<asio::mutable_buffer>* rx_buffers();
+    std::vector<asio::const_buffer>*   tx_buffers();
 
     friend class socket_impl;
     std::shared_ptr<udp_multiplexer_impl> impl() const;
 
 private:
-    boost::asio::executor _ex;
+    asio::any_io_executor _ex;
     std::shared_ptr<state> _state;
 };
 
@@ -91,14 +91,14 @@ auto udp_multiplexer::async_receive_from( const MutableBufferSequence& bufs
     if (auto rx_bufs = rx_buffers()) {
         rx_bufs->clear();
 
-        std::copy( boost::asio::buffer_sequence_begin(bufs)
-                 , boost::asio::buffer_sequence_end(bufs)
+        std::copy( asio::buffer_sequence_begin(bufs)
+                 , asio::buffer_sequence_end(bufs)
                  , std::back_inserter(*rx_bufs));
     }
 
-    boost::asio::async_completion
+    asio::async_completion
         < CompletionToken
-        , void(boost::system::error_code, size_t)
+        , void(std::error_code, size_t)
         > c(token);
 
     do_receive(ep, {get_executor(), std::move(c.completion_handler)});
@@ -116,14 +116,14 @@ auto udp_multiplexer::async_send_to( const ConstBufferSequence& bufs
     if (auto tx_bufs = tx_buffers()) {
         tx_bufs->clear();
 
-        std::copy( boost::asio::buffer_sequence_begin(bufs)
-                 , boost::asio::buffer_sequence_end(bufs)
+        std::copy( asio::buffer_sequence_begin(bufs)
+                 , asio::buffer_sequence_end(bufs)
                  , std::back_inserter(*tx_bufs));
     }
 
-    boost::asio::async_completion
+    asio::async_completion
         < CompletionToken
-        , void(boost::system::error_code, size_t)
+        , void(std::error_code, size_t)
         > c(token);
 
     do_send(destination, {get_executor(), std::move(c.completion_handler)});

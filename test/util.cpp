@@ -5,8 +5,8 @@
 #include <iostream>
 
 using namespace asio_utp;
-namespace ip = boost::asio::ip;
-using udp = boost::asio::ip::udp;
+namespace ip = asio::ip;
+using udp = asio::ip::udp;
 using namespace std;
 
 BOOST_AUTO_TEST_SUITE(util_tests)

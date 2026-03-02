@@ -14,13 +14,13 @@
 //------------------------------------------------------------------------------
 
 #include <boost/range.hpp>
-#include <boost/asio/error.hpp>
+#include <asio/error.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
-#include <boost/asio/connect.hpp>
-#include <boost/asio/spawn.hpp>
-#include <boost/asio/ip/tcp.hpp>
+#include <asio/connect.hpp>
+#include <asio/spawn.hpp>
+#include <asio/ip/tcp.hpp>
 #include <cstdlib>
 #include <functional>
 #include <iostream>
@@ -29,10 +29,10 @@
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
-namespace net = boost::asio;            // from <boost/asio.hpp>
+namespace net = asio;            // from <asio.hpp>
 namespace utp = asio_utp;
-using udp = boost::asio::ip::udp;
-using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
+using udp = asio::ip::udp;
+using tcp = asio::ip::tcp;       // from <asio/ip/tcp.hpp>
 
 //------------------------------------------------------------------------------
 

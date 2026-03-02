@@ -7,10 +7,9 @@
 
 #include <asio_utp.hpp>
 #include <namespaces.hpp>
-#include <boost/asio/spawn.hpp>
+#include <asio/spawn.hpp>
 
-namespace sys = boost::system;
-namespace asio = boost::asio;
+namespace sys  = std;
 namespace ip = asio::ip;
 using udp = ip::udp;
 using namespace std;

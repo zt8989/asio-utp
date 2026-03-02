@@ -1,6 +1,6 @@
 #pragma once
 
-#include <boost/asio/ip/udp.hpp>
+#include <asio/ip/udp.hpp>
 #include "namespaces.hpp"
 
 namespace asio_utp { namespace util {

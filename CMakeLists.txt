@@ -12,6 +12,7 @@ option(UTP_DEBUG_LOGGING      "Enable debug logging from libutp" OFF)
 project(asio_utp)
 
 set(CMAKE_CXX_STANDARD 14)
+set(ASIO_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/thirdparts/asio-1.36.0/include")
 
 find_package(Threads)
 find_package(Boost ${BOOST_VERSION} REQUIRED COMPONENTS
@@ -37,14 +38,15 @@ set_source_files_properties(${libutp_sources} PROPERTIES COMPILE_FLAGS
     "-Wno-sign-compare -DPOSIX -fno-exceptions -fno-rtti -O3"
 )
 target_include_directories(asio_utp
-    PUBLIC "include"
+    PUBLIC
+        "include"
+        "${ASIO_INCLUDE_DIR}"
     PRIVATE "src/libutp"
 )
 target_compile_definitions(asio_utp
     PUBLIC
-        # This is a static library, so don't include asio. Users need to link
-        # libboost_asio either statically or as a shared library.
-        -DBOOST_ASIO_SEPARATE_COMPILATION
+        -DASIO_STANDALONE
+        -DASIO_SEPARATE_COMPILATION
         # For some reason we need to define both of these
         -DBOOST_COROUTINES_NO_DEPRECATION_WARNING
         -DBOOST_COROUTINE_NO_DEPRECATION_WARNING
@@ -72,6 +74,9 @@ endif()
 # The static library asio_utp requires a separately compiled asio,
 # so supply one for the tests and examples.
 add_library(asio_utp_static_asio STATIC EXCLUDE_FROM_ALL "lib/asio.cpp")
+target_include_directories(asio_utp_static_asio
+    PUBLIC "${ASIO_INCLUDE_DIR}"
+)
 target_link_libraries(asio_utp_static_asio
     PUBLIC
         Boost::boost
@@ -80,7 +85,9 @@ target_link_libraries(asio_utp_static_asio
         Threads::Threads
 )
 target_compile_definitions(asio_utp_static_asio
-    PUBLIC -DBOOST_ASIO_SEPARATE_COMPILATION
+    PUBLIC
+        -DASIO_STANDALONE
+        -DASIO_SEPARATE_COMPILATION
 )
 
 #---------------------------------------------------------------------

@@ -1,9 +1,9 @@
 #include <iostream>
 #include <asio_utp.hpp>
-#include <boost/asio.hpp>
-#include <boost/asio/spawn.hpp>
-#include <boost/asio/streambuf.hpp>
-#include <boost/asio/posix/stream_descriptor.hpp>
+#include <asio.hpp>
+#include <asio/spawn.hpp>
+#include <asio/streambuf.hpp>
+#include <asio/posix/stream_descriptor.hpp>
 #include <unistd.h> // dup
 
 #include "block.h"
@@ -15,9 +15,8 @@
 #endif
 
 using namespace std;
-namespace asio = boost::asio;
 namespace ip   = asio::ip;
-namespace sys  = boost::system;
+namespace sys  = std;
 namespace utp  = asio_utp;
 
 struct defer {

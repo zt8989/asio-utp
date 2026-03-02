@@ -7,8 +7,8 @@
 #include <iostream>
 #include <sstream>
 #include <boost/range.hpp>
-#include <boost/asio.hpp>
-#include <boost/asio/spawn.hpp>
+#include <asio.hpp>
+#include <asio/spawn.hpp>
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int.hpp>
 #include <boost/utility/string_view.hpp>
@@ -16,7 +16,6 @@
 
 using namespace std;
 namespace utp = asio_utp;
-namespace asio = boost::asio;
 namespace rnd = boost::random;
 using asio::ip::tcp;
 using asio::ip::udp;
@@ -143,7 +142,7 @@ typename Proto::socket connect( asio::io_context& ioc
 {
     auto remote_ep = parse_endpoint<Proto>(remote_ep_s);
     typename Proto::socket socket(ioc);
-    boost::system::error_code ec;
+    std::error_code ec;
     socket.bind({asio::ip::address_v4::any(), 0}, ec);
     assert(!ec);
     socket.async_connect(remote_ep, yield);
@@ -176,7 +175,7 @@ template<> struct Async<utp::protocol> {
     {
         auto local_ep = parse_endpoint<utp::protocol>(local_ep_s);
     
-        boost::system::error_code ec;
+        std::error_code ec;
         utp::socket socket(ioc);
         socket.bind(local_ep, ec);
         assert(!ec);

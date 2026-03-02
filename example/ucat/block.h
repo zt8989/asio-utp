@@ -1,27 +1,27 @@
 #pragma once
 
 #include <memory>
-#include <boost/asio/spawn.hpp>
+#include <asio/spawn.hpp>
 
 class block {
 public:
-    block(const boost::asio::executor&);
+    block(const asio::any_io_executor&);
     block(const block&) = delete;
     block& operator=(const block&) = delete;
 
     ~block();
 
     void release();
-    void wait(boost::asio::yield_context yield);
+    void wait(asio::yield_context yield);
 
 private:
-    boost::asio::executor _ex;
-    std::function<void(boost::system::error_code)> _on_notify;
+    asio::any_io_executor _ex;
+    std::function<void(std::error_code)> _on_notify;
     bool _released = false;
 };
 
 inline
-block::block(const boost::asio::executor& ex)
+block::block(const asio::any_io_executor& ex)
     : _ex(ex)
 {}
 
@@ -30,8 +30,8 @@ block::~block()
 {
     if (!_on_notify) return;
 
-    boost::asio::post(_ex, [h = std::move(_on_notify)] {
-            h(boost::asio::error::operation_aborted);
+    asio::post(_ex, [h = std::move(_on_notify)] {
+            h(asio::error::operation_aborted);
         });
 }
 
@@ -42,16 +42,15 @@ void block::release()
 
     if (!_on_notify) return;
 
-    boost::asio::post(_ex, [h = std::move(_on_notify)] {
-            h(boost::system::error_code());
+    asio::post(_ex, [h = std::move(_on_notify)] {
+            h(std::error_code());
         });
 }
 
 inline
-void block::wait(boost::asio::yield_context yield)
+void block::wait(asio::yield_context yield)
 {
-    namespace asio   = boost::asio;
-    namespace system = boost::system;
+    namespace system = std;
 
     if (_released) return;
 

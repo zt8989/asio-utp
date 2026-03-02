@@ -14,12 +14,12 @@
 //------------------------------------------------------------------------------
 
 #include <boost/range.hpp>
-#include <boost/asio/error.hpp>
+#include <asio/error.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
-#include <boost/asio/ip/udp.hpp>
-#include <boost/asio/spawn.hpp>
+#include <asio/ip/udp.hpp>
+#include <asio/spawn.hpp>
 #include <boost/config.hpp>
 #include <algorithm>
 #include <cstdlib>
@@ -32,9 +32,9 @@
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
-namespace net = boost::asio;            // from <boost/asio.hpp>
+namespace net = asio;            // from <asio.hpp>
 namespace utp = asio_utp;
-using udp = boost::asio::ip::udp;       // from <boost/asio/ip/udp.hpp>
+using udp = asio::ip::udp;       // from <asio/ip/udp.hpp>
 
 // Return a reasonable mime type based on the extension of a file.
 beast::string_view

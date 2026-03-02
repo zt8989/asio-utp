@@ -30,11 +30,11 @@ struct udp_multiplexer::state {
     }
 };
 
-udp_multiplexer::udp_multiplexer(boost::asio::io_context& ioc)
+udp_multiplexer::udp_multiplexer(asio::io_context& ioc)
     : _ex(ioc.get_executor())
 {}
 
-udp_multiplexer::udp_multiplexer(const boost::asio::executor& ex)
+udp_multiplexer::udp_multiplexer(const asio::any_io_executor& ex)
     : _ex(ex)
 {}
 
@@ -135,7 +135,7 @@ bool udp_multiplexer::is_open() const
     return bool(_state);
 }
 
-void udp_multiplexer::close(boost::system::error_code& ec)
+void udp_multiplexer::close(std::error_code& ec)
 {
     if (!_state) {
         ec = asio::error::bad_descriptor;

@@ -1,11 +1,17 @@
 #pragma once
 
+#include <asio.hpp>
+#include <functional>
+#include <memory>
+#include <system_error>
+#include <utility>
+
 namespace asio_utp {
 
 template<typename... Args>
 class handler {
 private:
-    using error_code = boost::system::error_code;
+    using error_code = std::error_code;
 
     struct base {
         virtual void post(const error_code&, Args...) = 0;
@@ -19,7 +25,7 @@ private:
         Executor e;
         Allocator a;
         Func f;
-        boost::asio::executor_work_guard<Executor> w;
+        asio::executor_work_guard<Executor> w;
         std::function<void()> after;
 
         template<class E, class A, class F>
@@ -33,7 +39,7 @@ private:
         void post(const error_code& ec, Args... args) override
         {
             if (!after) {
-                e.post(std::bind(std::move(f), ec, args...), a);
+                asio::post(e, asio::bind_allocator(a, std::bind(std::move(f), ec, args...)));
             } else {
                 auto ff =
                     [f = std::move(f), after = std::move(after)]
@@ -42,14 +48,14 @@ private:
                         after();
                     };
 
-                e.post(std::bind(std::move(ff), ec, args...), a);
+                asio::post(e, asio::bind_allocator(a, std::bind(std::move(ff), ec, args...)));
             }
         }
 
         void dispatch(const error_code& ec, Args... args) override
         {
             if (!after) {
-                e.dispatch(std::bind(std::move(f), ec, args...), a);
+                asio::dispatch(e, asio::bind_allocator(a, std::bind(std::move(f), ec, args...)));
             } else {
                 auto ff =
                     [f = std::move(f), after = std::move(after)]
@@ -58,7 +64,7 @@ private:
                         after();
                     };
 
-                e.dispatch(std::bind(std::move(ff), ec, args...), a);
+                asio::dispatch(e, asio::bind_allocator(a, std::bind(std::move(ff), ec, args...)));
             }
         }
 
@@ -76,7 +82,7 @@ public:
 
     template<class Executor, class Func> handler(Executor&& exec, Func&& func)
     {
-        namespace net = boost::asio;
+        namespace net = asio;
 
         auto e = net::get_associated_executor(func, exec);
 

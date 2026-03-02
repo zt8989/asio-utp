@@ -8,9 +8,9 @@ namespace asio_utp {
 // TODO: It currently implements only a subset of the required API
 class protocol {
 public:
-    using endpoint = boost::asio::ip::udp::endpoint;
+    using endpoint = asio::ip::udp::endpoint;
     using socket = ::asio_utp::socket;
-    using resolver = boost::asio::ip::udp::resolver;
+    using resolver = asio::ip::udp::resolver;
 };
 
 } // namespace

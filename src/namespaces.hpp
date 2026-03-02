@@ -1,11 +1,11 @@
 #pragma once
 
-namespace boost { namespace asio {} }
-namespace boost { namespace system {} }
+#include <asio.hpp>
+#include <system_error>
 
 namespace asio_utp {
 
-namespace asio = boost::asio;
-namespace sys  = boost::system;
+namespace asio = ::asio;
+namespace sys  = std;
 
 } // namespace

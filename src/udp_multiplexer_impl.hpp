@@ -1,6 +1,6 @@
 #pragma once
 
-#include <boost/asio/ip/udp.hpp>
+#include <asio/ip/udp.hpp>
 #include "namespaces.hpp"
 #include "weak_from_this.hpp"
 #include "intrusive_list.hpp"
@@ -17,10 +17,10 @@ public:
     using endpoint_type = asio::ip::udp::endpoint;
 
     using on_send_to_handler = void(
-        const std::vector<boost::asio::const_buffer>&,
+        const std::vector<asio::const_buffer>&,
         size_t,
         const endpoint_type&,
-        boost::system::error_code
+        std::error_code
     );
     using on_send_to_connection = Signal<on_send_to_handler>::Connection;
 
@@ -62,11 +62,7 @@ public:
         return _udp_socket.local_endpoint();
     }
 
-#if BOOST_VERSION >= 107000
-    boost::asio::executor get_executor()
-#else
-    boost::asio::io_context::executor_type get_executor()
-#endif
+    asio::any_io_executor get_executor()
     {
         return _udp_socket.get_executor();
     }
