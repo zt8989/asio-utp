@@ -94,6 +94,7 @@ target_compile_definitions(asio_utp_static_asio
 #---------------------------------------------------------------------
 if(ASIO_UTP_WITH_EXAMPLES)
     add_subdirectory(example/ucat)
+    add_subdirectory(example/hybrid)
     if(ASIO_UTP_WITH_HTTP_EXAMPLES)
         add_subdirectory(example/http)
     endif()

@@ -31,7 +31,13 @@ socket_impl::on_event_connection socket_impl::on_event(std::function<on_event_ha
 
 void socket_impl::notify_event(socket_event ev, const sys::error_code& ec)
 {
-    auto wself = asio_utp::weak_from_this(this);
+    std::shared_ptr<socket_impl> self;
+    try {
+        self = shared_from_this();
+    } catch (const std::bad_weak_ptr&) {
+        return;
+    }
+    auto wself = std::weak_ptr<socket_impl>(self);
     asio::post(get_executor(), [wself, ev, ec] {
         if (auto self = wself.lock()) {
             self->_event_signal(ev, ec);
