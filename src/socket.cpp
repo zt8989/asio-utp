@@ -87,6 +87,12 @@ void socket::close()
     _socket_impl = nullptr;
 }
 
+socket::event_connection socket::on_event(event_handler h)
+{
+    if (!_socket_impl) return {};
+    return _socket_impl->on_event(std::move(h));
+}
+
 socket::~socket()
 {
     if (is_open()) _socket_impl->close();

@@ -3,6 +3,8 @@
 #include <asio/ip/udp.hpp>
 #include <asio/buffers_iterator.hpp>
 #include "detail/handler.hpp"
+#include "detail/signal.hpp"
+#include "event.hpp"
 
 namespace asio_utp {
 
@@ -13,6 +15,8 @@ class socket {
 public:
     using endpoint_type = asio::ip::udp::endpoint;
     using executor_type = asio::io_context::executor_type;
+    using event_handler = std::function<void(socket_event, const std::error_code&)>;
+    using event_connection = Signal<void(socket_event, const std::error_code&)>::Connection;
 
 public:
     socket() = default;
@@ -51,6 +55,8 @@ public:
     bool is_open() const;
 
     void close();
+
+    event_connection on_event(event_handler);
 
     asio::any_io_executor get_executor()
     {

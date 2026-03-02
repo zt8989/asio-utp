@@ -24,6 +24,21 @@ socket_impl::socket_impl(socket* owner)
     }
 }
 
+socket_impl::on_event_connection socket_impl::on_event(std::function<on_event_handler> h)
+{
+    return _event_signal.connect(std::move(h));
+}
+
+void socket_impl::notify_event(socket_event ev, const sys::error_code& ec)
+{
+    auto wself = asio_utp::weak_from_this(this);
+    asio::post(get_executor(), [wself, ev, ec] {
+        if (auto self = wself.lock()) {
+            self->_event_signal(ev, ec);
+        }
+    });
+}
+
 
 void socket_impl::bind(const endpoint_type& ep, sys::error_code& ec)
 {
@@ -54,6 +69,7 @@ void socket_impl::bind(const udp_multiplexer& m)
 
 void socket_impl::on_connect()
 {
+    notify_event(socket_event::connected);
     post_op(_connect_handler, "connect", sys::error_code());
 }
 
@@ -73,6 +89,7 @@ void socket_impl::on_receive(const unsigned char* buf, size_t size)
 
     if (!_recv_handler) {
         _rx_buffer_queue.push_back({buf, buf+size});
+        notify_event(socket_event::readable);
         return;
     }
 
@@ -101,6 +118,7 @@ void socket_impl::on_receive(const unsigned char* buf, size_t size)
         utp_read_drained((utp_socket*) _utp_socket);
     }
 
+    notify_event(socket_event::readable);
     post_op(_recv_handler, "recv", sys::error_code(), total);
 }
 
@@ -117,6 +135,7 @@ void socket_impl::on_accept(void* usocket)
     utp_set_userdata((utp_socket*) usocket, this);
 
     _utp_socket = usocket;
+    notify_event(socket_event::connected);
     dispatch_op(_accept_handler, "accept", sys::error_code());
 }
 
@@ -196,6 +215,7 @@ void socket_impl::on_writable()
         log(this, " socket_impl::on_writable");
     }
 
+    notify_event(socket_event::writable);
     if (!_send_handler) return;
     do_write(move(_send_handler));
 }
@@ -304,6 +324,7 @@ void socket_impl::on_eof()
 
     assert(!_got_eof);
     _got_eof = true;
+    notify_event(socket_event::eof);
 
     if (_recv_handler) {
         post_op(_recv_handler, "recv", asio::error::connection_reset, 0);
@@ -355,6 +376,7 @@ void socket_impl::close_with_error(const sys::error_code& ec)
     }
 
     _closed = true;
+    notify_event(socket_event::closed, ec);
 
     if (_accept_handler) {
         post_op(_accept_handler, "accept", ec);

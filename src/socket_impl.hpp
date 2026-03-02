@@ -2,6 +2,8 @@
 
 #include <boost/intrusive/list.hpp>
 #include <asio_utp/detail/handler.hpp>
+#include <asio_utp/detail/signal.hpp>
+#include <asio_utp/event.hpp>
 #include "intrusive_list.hpp"
 
 namespace asio_utp {
@@ -14,6 +16,8 @@ class udp_multiplexer;
 class socket_impl : public std::enable_shared_from_this<socket_impl> {
 public:
     using endpoint_type = asio::ip::udp::endpoint;
+    using on_event_handler = void(socket_event, const sys::error_code&);
+    using on_event_connection = Signal<on_event_handler>::Connection;
 
 public:
     socket_impl(const socket_impl&) = delete;
@@ -31,6 +35,7 @@ public:
     endpoint_type remote_endpoint() const;
 
     void close();
+    on_event_connection on_event(std::function<on_event_handler>);
 
     bool is_open() const { return _context && !_closed; }
 
@@ -72,6 +77,7 @@ private:
 
     template<class Handler, class... Args>
     void dispatch_op(Handler&, const char* dbg, const sys::error_code&, Args...);
+    void notify_event(socket_event, const sys::error_code& = {});
 
 private:
     asio::any_io_executor _ex;
@@ -88,6 +94,7 @@ private:
     handler<> _accept_handler;
     handler<size_t> _send_handler;
     handler<size_t> _recv_handler;
+    Signal<on_event_handler> _event_signal;
 
     size_t _bytes_sent = 0;
     std::vector<asio::const_buffer> _tx_buffers;
