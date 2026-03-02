@@ -5,7 +5,9 @@
 
 class block {
 public:
-    block(const boost::asio::executor&);
+    using executor_type = boost::asio::any_io_executor;
+
+    block(const executor_type&);
     block(const block&) = delete;
     block& operator=(const block&) = delete;
 
@@ -15,13 +17,13 @@ public:
     void wait(boost::asio::yield_context yield);
 
 private:
-    boost::asio::executor _ex;
+    executor_type _ex;
     std::function<void(boost::system::error_code)> _on_notify;
     bool _released = false;
 };
 
 inline
-block::block(const boost::asio::executor& ex)
+block::block(const executor_type& ex)
     : _ex(ex)
 {}
 
@@ -55,13 +57,15 @@ void block::wait(boost::asio::yield_context yield)
 
     if (_released) return;
 
-    asio::async_completion<decltype(yield), void(system::error_code)> c(yield);
-
-    _on_notify = [ h = std::move(c.completion_handler)
-                 , w = asio::make_work_guard(_ex)
-                 ] (const system::error_code& ec) mutable {
-                     h(ec);
-                 };
-
-    return c.result.get();
+    return asio::async_initiate<asio::yield_context, void(system::error_code)>(
+        [this](auto&& completion_handler) mutable {
+            auto h = std::make_shared<std::decay_t<decltype(completion_handler)>>(
+                std::forward<decltype(completion_handler)>(completion_handler));
+            _on_notify = [ h = std::move(h)
+                         , w = asio::make_work_guard(_ex)
+                         ] (const system::error_code& ec) mutable {
+                             (*h)(ec);
+                         };
+        },
+        yield);
 }

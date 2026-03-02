@@ -1,6 +1,7 @@
 #pragma once
 
 #include <boost/intrusive/list.hpp>
+#include <boost/asio/ip/udp.hpp>
 #include <asio_utp/detail/handler.hpp>
 #include "intrusive_list.hpp"
 
@@ -14,6 +15,7 @@ class udp_multiplexer;
 class socket_impl : public std::enable_shared_from_this<socket_impl> {
 public:
     using endpoint_type = boost::asio::ip::udp::endpoint;
+    using executor_type = boost::asio::ip::udp::socket::executor_type;
 
 public:
     socket_impl(const socket_impl&) = delete;
@@ -34,7 +36,7 @@ public:
 
     bool is_open() const { return _context && !_closed; }
 
-    boost::asio::executor get_executor()
+    executor_type get_executor()
     {
         return _ex;
     }
@@ -74,7 +76,7 @@ private:
     void dispatch_op(Handler&, const char* dbg, const sys::error_code&, Args...);
 
 private:
-    boost::asio::executor _ex;
+    executor_type _ex;
     service& _service;
 
     void* _utp_socket = nullptr;

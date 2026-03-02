@@ -1,6 +1,7 @@
 #pragma once
 
 #include <boost/asio.hpp>
+#include <map>
 #include "namespaces.hpp"
 
 namespace asio_utp {

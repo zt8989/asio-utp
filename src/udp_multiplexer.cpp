@@ -34,7 +34,7 @@ udp_multiplexer::udp_multiplexer(boost::asio::io_context& ioc)
     : _ex(ioc.get_executor())
 {}
 
-udp_multiplexer::udp_multiplexer(const boost::asio::executor& ex)
+udp_multiplexer::udp_multiplexer(const udp_multiplexer::executor_type& ex)
     : _ex(ex)
 {}
 

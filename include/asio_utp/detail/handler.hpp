@@ -1,5 +1,11 @@
 #pragma once
 
+#include <boost/asio.hpp>
+#include <functional>
+#include <memory>
+#include <type_traits>
+#include <utility>
+
 namespace asio_utp {
 
 template<typename... Args>
@@ -32,34 +38,32 @@ private:
 
         void post(const error_code& ec, Args... args) override
         {
+            namespace asio = boost::asio;
+
+            auto work = std::make_shared<decltype(w)>(std::move(w));
+
             if (!after) {
-                e.post(std::bind(std::move(f), ec, args...), a);
+                auto ff = [f = std::move(f), work](const error_code& ec, Args... args) mutable {
+                    f(ec, args...);
+                };
+                asio::post(e, std::bind(std::move(ff), ec, args...));
             } else {
                 auto ff =
-                    [f = std::move(f), after = std::move(after)]
+                    [f = std::move(f), after = std::move(after), work]
                     (const error_code& ec, auto... args) mutable {
                         f(ec, args...);
                         after();
                     };
 
-                e.post(std::bind(std::move(ff), ec, args...), a);
+                asio::post(e, std::bind(std::move(ff), ec, args...));
             }
         }
 
         void dispatch(const error_code& ec, Args... args) override
         {
-            if (!after) {
-                e.dispatch(std::bind(std::move(f), ec, args...), a);
-            } else {
-                auto ff =
-                    [f = std::move(f), after = std::move(after)]
-                    (const error_code& ec, auto... args) mutable {
-                        f(ec, args...);
-                        after();
-                    };
-
-                e.dispatch(std::bind(std::move(ff), ec, args...), a);
-            }
+            // Use post here for compatibility with executors that do not
+            // implement the deprecated dispatch member/free function APIs.
+            post(ec, args...);
         }
 
         void exec_after(std::function<void()> f) override
@@ -84,7 +88,7 @@ public:
                    ( func
                    , std::allocator<void>());
 
-        using impl_t = impl<decltype(e), decltype(a), Func>;
+        using impl_t = impl<decltype(e), decltype(a), std::decay_t<Func>>;
 
         // XXX: allocate `impl` using `a`
         _impl = std::make_unique<impl_t>( std::move(e)

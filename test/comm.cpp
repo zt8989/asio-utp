@@ -18,7 +18,7 @@ namespace utp = asio_utp;
 
 BOOST_AUTO_TEST_SUITE(comm_tests)
 
-static asio::mutable_buffers_1 buffer(std::string& s) {
+static asio::mutable_buffer buffer(std::string& s) {
     return asio::buffer(const_cast<char*>(s.data()), s.size());
 }
 
@@ -69,7 +69,6 @@ BOOST_AUTO_TEST_CASE(comm_server_reads)
 
     asio::spawn(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
-
         server_s.async_accept(yield[ec]);
         BOOST_REQUIRE(!ec);
 
@@ -79,11 +78,10 @@ BOOST_AUTO_TEST_CASE(comm_server_reads)
         BOOST_REQUIRE_EQUAL(rx_msg, tx_msg);
 
         on_finish();
-    });
+    }, asio::detached);
 
     asio::spawn(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
-
         client_s.async_connect(server_ep, yield[ec]);
         BOOST_REQUIRE(!ec);
 
@@ -91,7 +89,7 @@ BOOST_AUTO_TEST_CASE(comm_server_reads)
         BOOST_REQUIRE(!ec);
 
         on_finish();
-    });
+    }, asio::detached);
 
     ioc.run();
 
@@ -143,7 +141,7 @@ BOOST_AUTO_TEST_CASE(comm_exchange)
         BOOST_REQUIRE(!ec);
 
         on_finish();
-    });
+    }, asio::detached);
 
     asio::spawn(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
@@ -161,7 +159,7 @@ BOOST_AUTO_TEST_CASE(comm_exchange)
         BOOST_REQUIRE_EQUAL(rx_msg.substr(0, size), "hello from server");
 
         on_finish();
-    });
+    }, asio::detached);
 
     ioc.run();
 
@@ -212,7 +210,7 @@ BOOST_AUTO_TEST_CASE(comm_test2)
         }
 
         on_finish();
-    });
+    }, asio::detached);
 
     asio::spawn(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
@@ -225,7 +223,7 @@ BOOST_AUTO_TEST_CASE(comm_test2)
         BOOST_REQUIRE(!ec);
 
         on_finish();
-    });
+    }, asio::detached);
 
     ioc.run();
 
@@ -276,7 +274,7 @@ BOOST_AUTO_TEST_CASE(comm_same_endpoint_multiplex)
         BOOST_REQUIRE(!ec);
         server1.close();
         server2.close();
-    });
+    }, asio::detached);
 
     asio::spawn(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
@@ -299,7 +297,7 @@ BOOST_AUTO_TEST_CASE(comm_same_endpoint_multiplex)
 
         client2.async_connect(server1.local_endpoint(), yield[ec]);
         BOOST_REQUIRE(!ec);
-    });
+    }, asio::detached);
 
     ioc.run();
 }
@@ -355,7 +353,7 @@ BOOST_AUTO_TEST_CASE(comm_send_large_data)
         server_s.async_read_some(buffer(rx_msg), yield[ec]);
         BOOST_REQUIRE_EQUAL(ec, asio::error::connection_reset);
         //server_s.close();
-    });
+    }, asio::detached);
 
     asio::spawn(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
@@ -378,7 +376,7 @@ BOOST_AUTO_TEST_CASE(comm_send_large_data)
         }
 
         client_s.close();
-    });
+    }, asio::detached);
 
     ioc.run();
 }
@@ -400,13 +398,13 @@ BOOST_AUTO_TEST_CASE(comm_abort_accept)
         sys::error_code ec;
 
         asio::spawn(ioc, [&socket, &ioc] (asio::yield_context yield) {
-            ioc.post(yield); // So that closing happens _after_ the accept
+            asio::post(ioc, yield); // So that closing happens _after_ the accept
             socket.close();
-        });
+        }, asio::detached);
 
         socket.async_accept(yield[ec]);
         BOOST_REQUIRE_EQUAL(ec, asio::error::operation_aborted);
-    });
+    }, asio::detached);
 
     ioc.run();
 }
@@ -433,15 +431,15 @@ BOOST_AUTO_TEST_CASE(comm_abort_connect)
         sys::error_code ec;
 
         asio::spawn(ioc, [&client_s, &ioc] (asio::yield_context yield) {
-            ioc.post(yield); // So that closing happens _after_ the accept
+            asio::post(ioc, yield); // So that closing happens _after_ the accept
             client_s.close();
-        });
+        }, asio::detached);
 
         client_s.async_connect(server_s.local_endpoint(), yield[ec]);
         BOOST_REQUIRE_EQUAL(ec, asio::error::operation_aborted);
 
         server_s.close();
-    });
+    }, asio::detached);
 
     ioc.run();
 }
@@ -481,16 +479,16 @@ BOOST_AUTO_TEST_CASE(comm_abort_recv)
         BOOST_REQUIRE(!ec);
 
         asio::spawn(ioc, [&server_s, &ioc](asio::yield_context yield) {
-            ioc.post(yield);
+            asio::post(ioc, yield);
             server_s.close();
-        });
+        }, asio::detached);
 
         string rx_msg(256, '\0');
         server_s.async_read_some(buffer(rx_msg), yield[ec]);
         BOOST_REQUIRE_EQUAL(ec, asio::error::operation_aborted);
 
         on_finish();
-    });
+    }, asio::detached);
 
     asio::spawn(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
@@ -499,16 +497,16 @@ BOOST_AUTO_TEST_CASE(comm_abort_recv)
         BOOST_REQUIRE(!ec);
 
         asio::spawn(ioc, [&client_s, &ioc](asio::yield_context yield) {
-            ioc.post(yield);
+            asio::post(ioc, yield);
             client_s.close();
-        });
+        }, asio::detached);
 
         string rx_msg(256, '\0');
         client_s.async_read_some(buffer(rx_msg), yield[ec]);
         BOOST_REQUIRE_EQUAL(ec, asio::error::operation_aborted);
 
         on_finish();
-    });
+    }, asio::detached);
 
     ioc.run();
 
@@ -562,7 +560,7 @@ BOOST_AUTO_TEST_CASE(comm_server_eof)
         string rx_msg(256, '\0');
         server_s.async_read_some(buffer(rx_msg), yield[ec]);
         BOOST_REQUIRE_EQUAL(ec, asio::error::connection_reset);
-    });
+    }, asio::detached);
 
     asio::spawn(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
@@ -571,7 +569,7 @@ BOOST_AUTO_TEST_CASE(comm_server_eof)
         BOOST_REQUIRE(!ec);
 
         client_s.close();
-    });
+    }, asio::detached);
 
     ioc.run();
 }
@@ -605,7 +603,7 @@ BOOST_AUTO_TEST_CASE(comm_client_eof)
         server_s.async_read_some(buffer(msg), yield[ec]);
 
         server_s.close();
-    });
+    }, asio::detached);
 
     asio::spawn(ioc, [&](asio::yield_context yield) {
         sys::error_code ec;
@@ -621,7 +619,7 @@ BOOST_AUTO_TEST_CASE(comm_client_eof)
 
         client_s.async_read_some(buffer(msg), yield[ec]);
         BOOST_REQUIRE_EQUAL(ec, asio::error::connection_reset);
-    });
+    }, asio::detached);
 
     ioc.run();
 }

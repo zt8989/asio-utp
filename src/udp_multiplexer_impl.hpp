@@ -15,6 +15,7 @@ class udp_multiplexer_impl
 {
 public:
     using endpoint_type = asio::ip::udp::endpoint;
+    using executor_type = asio::ip::udp::socket::executor_type;
 
     using on_send_to_handler = void(
         const std::vector<boost::asio::const_buffer>&,
@@ -62,11 +63,7 @@ public:
         return _udp_socket.local_endpoint();
     }
 
-#if BOOST_VERSION >= 107000
-    boost::asio::executor get_executor()
-#else
-    boost::asio::io_context::executor_type get_executor()
-#endif
+    executor_type get_executor()
     {
         return _udp_socket.get_executor();
     }

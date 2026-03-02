@@ -9,7 +9,7 @@ socket::socket(boost::asio::io_context& ioc)
     : _ex(ioc.get_executor())
 {}
 
-socket::socket(const boost::asio::executor& ex)
+socket::socket(const socket::executor_type& ex)
     : _ex(ex)
 {}
 
@@ -111,7 +111,7 @@ void socket::do_connect(const endpoint_type& ep_, handler<>&& h)
         }
     }
 
-    _socket_impl->do_connect(ep, std::move(move(h)));
+    _socket_impl->do_connect(ep, std::move(h));
 }
 
 void socket::do_accept(handler<>&& h)

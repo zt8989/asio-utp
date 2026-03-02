@@ -2,6 +2,7 @@
 
 #include <boost/asio/ip/udp.hpp>
 #include <boost/asio/buffers_iterator.hpp>
+#include <type_traits>
 #include "detail/handler.hpp"
 
 namespace asio_utp {
@@ -12,7 +13,7 @@ class udp_multiplexer;
 class socket {
 public:
     using endpoint_type = boost::asio::ip::udp::endpoint;
-    using executor_type = boost::asio::io_context::executor_type;
+    using executor_type = boost::asio::ip::udp::socket::executor_type;
 
 public:
     socket() = default;
@@ -23,7 +24,7 @@ public:
     socket(socket&&);
     socket& operator=(socket&&);
 
-    socket(const boost::asio::executor&);
+    socket(const executor_type&);
     socket(boost::asio::io_context&);
 
     void bind(const endpoint_type&, boost::system::error_code&);
@@ -31,10 +32,10 @@ public:
     void bind(const udp_multiplexer&, boost::system::error_code&);
 
     template<typename CompletionToken>
-    void async_connect(const endpoint_type&, CompletionToken&&);
+    auto async_connect(const endpoint_type&, CompletionToken&&);
 
     template<typename CompletionToken>
-    void async_accept(CompletionToken&&);
+    auto async_accept(CompletionToken&&);
 
     template< typename ConstBufferSequence
             , typename CompletionToken>
@@ -52,7 +53,7 @@ public:
 
     void close();
 
-    boost::asio::executor get_executor()
+    executor_type get_executor()
     {
         return _ex;
     }
@@ -73,32 +74,36 @@ private:
 
 private:
     friend class socket_impl;
-    boost::asio::executor _ex;
+    executor_type _ex;
     std::shared_ptr<socket_impl> _socket_impl;
 };
 
 template<typename CompletionToken>
 inline
-void socket::async_connect(const endpoint_type& ep, CompletionToken&& token)
+auto socket::async_connect(const endpoint_type& ep, CompletionToken&& token)
 {
-    boost::asio::async_completion
-        <CompletionToken, void(boost::system::error_code)> c(token);
-
-    do_connect(ep, {get_executor(), std::move(c.completion_handler)});
-
-    return c.result.get();
+    return boost::asio::async_initiate
+        <CompletionToken, void(boost::system::error_code)>(
+            [this, ep](auto&& completion_handler) mutable {
+                do_connect(ep, {get_executor(),
+                                std::forward<decltype(completion_handler)>(
+                                    completion_handler)});
+            },
+            token);
 }
 
 template<typename CompletionToken>
 inline
-void socket::async_accept(CompletionToken&& token)
+auto socket::async_accept(CompletionToken&& token)
 {
-    boost::asio::async_completion
-        <CompletionToken, void(boost::system::error_code)> c(token);
-
-    do_accept({get_executor(), std::move(c.completion_handler)});
-
-    return c.result.get();
+    return boost::asio::async_initiate
+        <CompletionToken, void(boost::system::error_code)>(
+            [this](auto&& completion_handler) mutable {
+                do_accept({get_executor(),
+                           std::forward<decltype(completion_handler)>(
+                               completion_handler)});
+            },
+            token);
 }
 
 template< typename ConstBufferSequence
@@ -115,14 +120,15 @@ auto socket::async_write_some( const ConstBufferSequence& bufs
                  , std::back_inserter(*txb));
     }
 
-    boost::asio::async_completion
+    return boost::asio::async_initiate
         < CompletionToken
         , void(boost::system::error_code, size_t)
-        > c(token);
-
-    do_write({get_executor(), std::move(c.completion_handler)});
-
-    return c.result.get();
+        >([this](auto&& completion_handler) mutable {
+                do_write({get_executor(),
+                          std::forward<decltype(completion_handler)>(
+                              completion_handler)});
+          },
+          token);
 }
 
 template< typename MutableBufferSequence
@@ -139,14 +145,15 @@ auto socket::async_read_some( const MutableBufferSequence& bufs
                  , std::back_inserter(*rxb));
     }
 
-    boost::asio::async_completion
+    return boost::asio::async_initiate
         < CompletionToken
         , void(boost::system::error_code, size_t)
-        > c(token);
-
-    do_read({get_executor(), std::move(c.completion_handler)});
-
-    return c.result.get();
+        >([this](auto&& completion_handler) mutable {
+                do_read({get_executor(),
+                         std::forward<decltype(completion_handler)>(
+                             completion_handler)});
+          },
+          token);
 }
 
 } // namespace

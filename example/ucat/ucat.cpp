@@ -33,7 +33,7 @@ ip::udp::endpoint parse_endpoint(string s)
         throw runtime_error("Failed to parse endpoint");
     }
 
-    auto addr = ip::address::from_string(s.substr(0, pos));
+    auto addr = ip::make_address(s.substr(0, pos));
     auto port = s.substr(pos + 1);
 
     if (port.empty()) port = "0";
